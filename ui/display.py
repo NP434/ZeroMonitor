@@ -39,7 +39,7 @@ while running:
             if settings_button.collidepoint(event.pos):
                 print("Settings button pressed!")
 
-    # Fill screen       
+    # Fill screen
     screen.fill(BLACK)
 
     # Draw settings button
@@ -56,8 +56,6 @@ while running:
     # draw text
     text_surface = font.render("Zero Monitor 1024x600 LCD Simulation!", True, WHITE)
     screen.blit(text_surface, (60, 350))
-
-
 
     # Update display
     pygame.display.flip()

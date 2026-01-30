@@ -4,7 +4,7 @@ Author: Daniel Stone
 File Description: Classes for different widgets that may be used on screen
 """
 import pygame
-import theme
+import ui.theme as theme
 
 # default colors
 WHITE = (255, 255, 255)

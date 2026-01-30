@@ -1,6 +1,6 @@
 import pygame
-import theme
-from widgets import Button
+import ui.theme as theme
+from ui.widgets import Button
 
 # Colors
 BLACK = (0,0,0)
@@ -40,7 +40,7 @@ class MainScreen(BaseScreen):
     Dashboard/main screen that users will see
     """
     def __init__(self, app):
-        super.__init__(app)
+        super().__init__(app)
     
         # Create settings button
         self.settings_button = Button(

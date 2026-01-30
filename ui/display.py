@@ -8,7 +8,7 @@ between them.
 """
 import pygame
 import sys
-from screens import MainScreen, SettingsScreen
+from ui.screens import MainScreen, SettingsScreen
 
 # initialize pygame
 pygame.init()

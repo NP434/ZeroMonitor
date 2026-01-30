@@ -1,7 +1,7 @@
 import pygame
 import datetime
 import ui.theme as theme
-from ui.widgets import Button
+from ui.widgets import Button, Slider
 
 # Colors
 BLACK = (0,0,0)
@@ -98,7 +98,11 @@ class MainScreen(BaseScreen):
         )
         surface.blit(text, (60, 200))
 
+
 class SettingsScreen(BaseScreen):
+    """
+    Screen for users to change settings of Zero Monitor device
+    """
     def __init__(self, app):
         super().__init__(app)
 
@@ -108,10 +112,31 @@ class SettingsScreen(BaseScreen):
             text="Back"
         )
 
+        # Brightness Slider
+        self.brightness_slider = Slider(
+            rect=(200, 200, 600, 20),
+            min_value=0,
+            max_value=100,
+            default_value=50,
+            label="Brightness",
+            track_color=theme.BLUE,
+            on_change=self.on_brightness_change
+        )
+
+        self.brightness_value = 50
+
+    def on_brightness_change(self, value):
+        pass
+
     def handle_event(self, event):
+        self.brightness_slider.handle_event(event)
+        
         if event.type == pygame.MOUSEBUTTONDOWN:
             if self.back_button.is_clicked(event.pos):
                 self.app.change_screen("main")
+
+        self.brightness_slider.handle_event(event)
+            
 
     def draw(self, surface):
         surface.fill(theme.GRAY)
@@ -125,3 +150,6 @@ class SettingsScreen(BaseScreen):
             title,
             (self.app.width // 2 - title.get_width() // 2, 100)
         )
+
+        # Draw Brightness slider
+        self.brightness_slider.draw(surface)

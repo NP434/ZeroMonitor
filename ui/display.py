@@ -1,61 +1,58 @@
+"""
+Filename: display.py
+Author: Daniel Stone
+
+File Description: Contains main application and screen manager for Zero Monitor UI. It
+initializes pygame, creates window, registers available screens, and handles switching
+between them.
+"""
 import pygame
 import sys
+from screens import MainScreen, SettingsScreen
 
 # initialize pygame
 pygame.init()
-running = True
 
-# set screen size to match LCD resolution
-SCREEN_WIDTH = 1024
-SCREEN_HEIGHT = 600
+class App:
+    def __init__(self):
+        # Establish screen resolution
+        self.width = 1024
+        self.height = 600
 
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Simulated 1024x600 LCD Screen")
+        self.screen = pygame.display.set_mode((self.width, self.height))
+        pygame.display.set_caption("Zero Monitor LCD UI")
 
-# Colors (though there are defaults provided)
-BLACK = (0,0,0)
-WHITE = (255, 255, 255)
-GRAY = (60, 60, 60)
-BLUE = (0, 120, 255)
+        # Register screens
+        self.screens = {
+            "main": MainScreen(self),
+            "settings": SettingsScreen (self)
+        }
 
-# Font
-font = pygame.font.SysFont("Arial", 32)
+        # Starting on the main screen
+        self.current_screen = self.screens["main"]
 
-# Button dimensions
-button_width = 160
-button_height = 60
-button_x = SCREEN_WIDTH - button_width - 20
-button_y = 20
+    def change_screen(self, name):
+        self.current_screen = self.screens[name]
 
-settings_button = pygame.Rect(button_x, button_y, button_width, button_height)
+    def run(self):
+        running = True
 
-# Main loop
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if settings_button.collidepoint(event.pos):
-                print("Settings button pressed!")
+                # Send events to the active screen to be handled
+                self.current_screen.handle_event(event)
+            
+            # Update and draw the active screen
+            self.current_screen.update()
+            self.current_screen.draw(self.screen)
 
-    # Fill screen
-    screen.fill(BLACK)
+            pygame.display.flip()
 
-    # Draw settings button
-    pygame.draw.rect(screen, BLUE, settings_button, border_radius=10)
+        pygame.quit()
+        sys.exit()
 
-    # Draw button text
-    text_surface = font.render("Settings", True, WHITE)
-    text_rect = text_surface.get_rect(center=settings_button.center)
-    screen.blit(text_surface, text_rect)
-
-    # Draw rectangle
-    pygame.draw.rect(screen, GRAY, (50, 300, 924, 120))
-
-    # draw text
-    text_surface = font.render("Zero Monitor 1024x600 LCD Simulation!", True, WHITE)
-    screen.blit(text_surface, (60, 350))
-
-    # Update display
-    pygame.display.flip()
+if __name__ == "__main":
+    App().run()

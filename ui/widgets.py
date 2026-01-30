@@ -37,3 +37,28 @@ class Button:
     def is_clicked(self, pos):
         return self.rect.collidepoint(pos)
     
+
+class Slider:
+    """
+    A horizontal slider widget that allows user to drag a handle to select a value
+    between min_value and max_value
+    """
+
+    def __init__(
+            self,
+            rect,
+            min_value=0,
+            max_value=100,
+            default_value=50,
+            track_color=None,
+            handle_color=None,
+            on_change=None
+    )
+        self.rect = pygame.Rect(rect)
+        self.min_value = min_value
+        self.max_value = max_value
+        self.value = default_value
+
+        self.track_color = track_color or theme.GRAY
+        self.handle_color = handle_color or theme.WHITE
+        

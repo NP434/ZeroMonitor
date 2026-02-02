@@ -1,5 +1,5 @@
-import pygame
 import datetime
+import pygame
 from ui.screens.BaseScreen import BaseScreen
 from ui.widgets.Button import Button
 from ui.widgets.SidebarPanel import SidebarPanel
@@ -71,9 +71,6 @@ class MainScreen(BaseScreen):
         # Draw Button
         self.settings_button.draw(surface)
 
-        # Draw sidebar
-        self.sidebar.draw(surface)
-
         # Draw remaining contents on screen
         pygame.draw.rect(surface, theme.GRAY, (50, 150, 924, 120))
         text = theme.DEFAULT_FONT.render(
@@ -82,3 +79,6 @@ class MainScreen(BaseScreen):
             theme.WHITE
         )
         surface.blit(text, (60, 200))
+
+        # Draw sidebar
+        self.sidebar.draw(surface)

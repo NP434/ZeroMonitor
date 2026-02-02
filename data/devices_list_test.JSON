@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Daniel's Mac",
+    "ip": "192.168.1.10",
+    "status": "Available",
+    "stats": {
+      "cpu": 12.5,
+      "memory": 43.2,
+      "temp": 37.8
+    }
+  },
+  {
+    "name": "Alec's Server",
+    "ip": "192.168.1.11",
+    "status": "Degraded",
+    "stats": {
+      "cpu": 78.1,
+      "memory": 82.3,
+      "temp": 65.4
+    }
+  },
+  {
+    "name": "Grant's Pi",
+    "ip": "192.168.1.12",
+    "status": "Offline",
+    "stats": {
+      "cpu": null,
+      "memory": null,
+      "temp": null
+    }
+  }
+]

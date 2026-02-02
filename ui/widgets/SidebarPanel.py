@@ -1,9 +1,14 @@
+"""
+Docstring for ui.widgets.SidebarPanel
+"""
 import pygame
-import ui.theme as theme
 from ui.widgets.Button import Button
 
 class SidebarPanel:
-    def __init__(self, x, y, width_expanded, width_collapsed, height, toggle_button=None):
+    """
+    Docstring for SidebarPanel
+    """
+    def __init__(self, x, y, width_expanded, width_collapsed, height, expanded=False, toggle_button=None):
         self.x = x
         self.y = y
         self.width_collapsed = width_collapsed
@@ -11,7 +16,7 @@ class SidebarPanel:
         self.current_width = width_collapsed
         self.height = height
 
-        self.expanded = False
+        self.expanded = True
         self.animation_speed = 10
 
         # Colors 

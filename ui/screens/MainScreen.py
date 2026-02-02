@@ -34,6 +34,11 @@ class MainScreen(BaseScreen):
             height=app.height
         )
 
+        self.device_buttons = []
+        self.device_scroll = 0
+
+        self._build_device_buttons()
+
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             if self.settings_button.is_clicked(event.pos):
@@ -82,3 +87,23 @@ class MainScreen(BaseScreen):
 
         # Draw sidebar
         self.sidebar.draw(surface)
+
+    def _build_device_buttons(self):
+        button_width = self.sidebar.width_expanded - 20
+        button_height = 40
+        x = self.sidebar.x + 10
+        y = 60
+
+        for device in self.app.devices:
+            status = device.get("status", "Offline")
+            color = theme.STATUS_COLORS.get(status, (100, 100, 100))
+
+            btn = Button(
+                rect=(x, y, button_width, button_height),
+                text=device["name"],
+                bg_color=color
+            )
+            btn.device = device
+            self.device_buttons.append(btn)
+
+            y += button_height + 10

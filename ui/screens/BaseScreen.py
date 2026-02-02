@@ -1,4 +1,3 @@
-
 # Abstract base class for screens
 class BaseScreen:
     """

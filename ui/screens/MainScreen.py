@@ -18,6 +18,7 @@ class MainScreen(BaseScreen):
             text="Settings"
         )
 
+        # Create clock button
         self.clock_button = Button(
             rect=(20, 20, 150, 40),
             text="",
@@ -26,6 +27,7 @@ class MainScreen(BaseScreen):
         )
         self.use_24hr = False
 
+        # Create sidebar panel
         self.sidebar = SidebarPanel(
             x=0,
             y=0,
@@ -34,9 +36,9 @@ class MainScreen(BaseScreen):
             height=app.height
         )
 
+        # Initalize device list
         self.device_buttons = []
         self.device_scroll = 0
-
         self._build_device_buttons()
 
     def handle_event(self, event):
@@ -46,6 +48,15 @@ class MainScreen(BaseScreen):
             
             if self.clock_button.is_clicked(event.pos):
                 self.use_24hr = not self.use_24hr
+
+            if self.sidebar.current_width > self.sidebar.width_collapsed + 20:
+                for btn in self.device_buttons:
+                    scrolled_rect = btn.rect.move(0, self.device_scroll)
+                    if scrolled_rect.collidepoint(event.pos):
+                        print("Clicked device:", btn.device["name"])
+
+        elif event.type == pygame.MOUSEWHEEL:
+            self.scroll_devices(event.y)
 
         self.sidebar.handle_event(event)
 
@@ -73,9 +84,6 @@ class MainScreen(BaseScreen):
         )
         surface.blit(title_text, title_rect)
 
-        # Draw Button
-        self.settings_button.draw(surface)
-
         # Draw remaining contents on screen
         pygame.draw.rect(surface, theme.GRAY, (50, 150, 924, 120))
         text = theme.DEFAULT_FONT.render(
@@ -85,8 +93,52 @@ class MainScreen(BaseScreen):
         )
         surface.blit(text, (60, 200))
 
+        # Draw Button
+        self.settings_button.draw(surface)
+
+        # --- Side Bar Elements ---
+
         # Draw sidebar
         self.sidebar.draw(surface)
+
+        # Draw device buttons when sidebar is expanded
+        if self.sidebar.current_width > self.sidebar.width_collapsed + 20:
+            for btn in self.device_buttons:
+                scrolled_rect = btn.rect.move(0, self.device_scroll)
+                if scrolled_rect.bottom < 0 or scrolled_rect.top > self.app.height:
+                    continue
+
+                original_rect = btn.rect
+                btn.rect = scrolled_rect
+                btn.draw(surface)
+                btn.rect = original_rect
+
+    def scroll_devices(self, direction):
+        scroll_amount = 20
+        self.device_scroll += direction * scroll_amount
+
+        # Calculate spacing in between buttons
+        if len(self.device_buttons) > 1 :
+            first = self.device_buttons[0].rect
+            second = self.device_buttons[1].rect
+            spacing = second.y - first.y - first.height
+        else:
+            spacing = 0
+
+        # Calculate total height of all device buttons
+        total_height = 0
+        for btn in self.device_buttons:
+            total_height += btn.rect.height + spacing
+        
+        visible_height = self.sidebar.height - 60
+        max_scroll = 0
+        min_scroll = min(0, visible_height - total_height)
+
+        # Clamp
+        if self.device_scroll > max_scroll:
+            self.device_scroll = max_scroll
+        elif self.device_scroll < min_scroll:
+            self.device_scroll = min_scroll
 
     def _build_device_buttons(self):
         button_width = self.sidebar.width_expanded - 20

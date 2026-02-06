@@ -2,6 +2,7 @@ import pygame
 import datetime
 from ui.screens.BaseScreen import BaseScreen
 from ui.widgets.Button import Button
+from ui.widgets.SidebarPanel import SidebarPanel
 import ui.theme as theme
 
 class MainScreen(BaseScreen):
@@ -25,6 +26,14 @@ class MainScreen(BaseScreen):
         )
         self.use_24hr = False
 
+        self.sidebar = SidebarPanel(
+            x=0,
+            y=0,
+            width_expanded=250,
+            width_collapsed=40,
+            height=app.height
+        )
+
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             if self.settings_button.is_clicked(event.pos):
@@ -32,6 +41,11 @@ class MainScreen(BaseScreen):
             
             if self.clock_button.is_clicked(event.pos):
                 self.use_24hr = not self.use_24hr
+
+        self.sidebar.handle_event(event)
+
+    def update(self):
+        self.sidebar.update()
 
     def draw(self, surface):
         surface.fill(theme.BLACK)
@@ -56,6 +70,9 @@ class MainScreen(BaseScreen):
 
         # Draw Button
         self.settings_button.draw(surface)
+
+        # Draw sidebar
+        self.sidebar.draw(surface)
 
         # Draw remaining contents on screen
         pygame.draw.rect(surface, theme.GRAY, (50, 150, 924, 120))

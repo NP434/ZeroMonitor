@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from fabric import Connection
 import time
 from concurrent.futures import ThreadPoolExecutor
+from json import dump, load
 
 @dataclass
 class SystemMetrics:
@@ -20,10 +21,12 @@ class MetricsProvider(ABC):
 
     @abstractmethod
     def collect(self) -> SystemMetrics:
+        """Abstract method to be implemented by subclasses"""
         pass
 
 class LinuxMetricsProvider(MetricsProvider):
     def collect(self) -> SystemMetrics:
+        """Linux specific metrics provider"""
         cmd = r"""
 HOST=$(hostname)
 TEMP=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo "")
@@ -100,9 +103,7 @@ Write-Output \"DISK=$disk\"
 
 @dataclass
 class Node:
-    # Common Name
     name: str
-    # Connection ready to provide metrics
     provider: MetricsProvider
 
 nodes = [
@@ -117,7 +118,7 @@ nodes = [
     Node(
         name="AlecsPC",
         provider=WindowsMetricsProvider(
-            Connection("AlecsPC")
+            Connection("AlecPC")
         )
     ),
 ]
@@ -125,14 +126,23 @@ nodes = [
 def poll_node(node: Node):
     """Function to poll a single node and handle errors gracefully"""
     try:
+        temp_data = node.provider.collect()
+        if temp_data:
+            with open("data_cache.json", "w") as file:
+                dump(temp_data, file)
         return node.name, node.provider.collect()
+        
+        with open("data_cache.json", "r") as file:
+            temp_data = load(file)
+        print("Using cached data")
+        return temp_data
+            
     except Exception as e:
         return node.name, f"ERROR: {e}"
 
 def poll_nodes(nodes, interval=5):
     """Function to poll multiple nodes concurrently using ThreadPoolExecutor"""
     with ThreadPoolExecutor(max_workers=len(nodes)) as executor:
-        # Polling loop
         while True:
             futures = [executor.submit(poll_node, n) for n in nodes]
 

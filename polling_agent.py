@@ -1,14 +1,16 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Optional
 from abc import ABC, abstractmethod
 from fabric import Connection
 import time
 from concurrent.futures import ThreadPoolExecutor
 from json import dump, load
+from datetime import datetime
 
 @dataclass
 class SystemMetrics:
     hostname: str
+    timestamp: str
     cpu_temp_c: Optional[float]
     cpu_load_1m: Optional[float]
     mem_total_mb: Optional[int]
@@ -40,7 +42,7 @@ echo "LOAD=$LOAD"
 echo "MEM=$MEM"
 echo "DISK=$DISK"
 """
-        result = self.conn.run(cmd, hide=True)
+        result = self.conn.run(cmd, hide=True)                      # ADD BACK after cmd.    , hide=True
         data = {}
 
         for line in result.stdout.splitlines():
@@ -58,6 +60,7 @@ echo "DISK=$DISK"
 
         return SystemMetrics(
             hostname=data["HOST"],
+            timestamp = datetime.now().isoformat(),
             cpu_temp_c=cpu_temp,
             cpu_load_1m=float(data["LOAD"]),
             mem_total_mb=mem_total,
@@ -94,6 +97,7 @@ Write-Output \"DISK=$disk\"
 
         return SystemMetrics(
             hostname=data["HOST"],
+            timestamp = datetime.now().isoformat(),
             cpu_temp_c=None,
             cpu_load_1m=float(data["CPU"]) / 100.0,
             mem_total_mb=int(mem_total),
@@ -110,35 +114,42 @@ nodes = [
     Node(
         name="AlecsPi5",
         provider=LinuxMetricsProvider(
-            # This connection references the Hosts found within .ssh/config
-            # Will need to change this to accept raw parameters (Host, User, HostName) (AlecsPi5, alechoelscher, 192.168.-.-)
-            Connection("AlecsPi5")
+            Connection(host="192.168.0.53", user="alechoelscher", connect_timeout = 3)
         )
     ),
     Node(
         name="AlecsPC",
         provider=WindowsMetricsProvider(
-            Connection("AlecPC")
+            Connection(host="192.168.0.67", user="cliff", connect_timeout = 3)
+        )
+    ),
+    Node(
+        name="Pihole",
+        provider=LinuxMetricsProvider(
+            Connection("Pihole")
         )
     ),
 ]
 
 def poll_node(node: Node):
-    """Function to poll a single node and handle errors gracefully"""
+    cache_filename = f"{node.name}_cache.json"
     try:
-        temp_data = node.provider.collect()
-        if temp_data:
-            with open("data_cache.json", "w") as file:
-                dump(temp_data, file)
-        return node.name, node.provider.collect()
+        metrics = node.provider.collect()
         
-        with open("data_cache.json", "r") as file:
-            temp_data = load(file)
-        print("Using cached data")
-        return temp_data
+        # Save data to cache
+        with open(cache_filename, "w") as file:
+            dump(asdict(metrics), file, indent=4)
             
+        return node.name, metrics
+
     except Exception as e:
-        return node.name, f"ERROR: {e}"
+        # Try to load the last successful data from the cache
+        try:
+            with open(cache_filename, "r") as file:
+                cached_data = load(file)
+            return node.name, f"OFFLINE (Cache from {cached_data.get('timestamp')}): {cached_data}"
+        except FileNotFoundError:
+            return node.name, f"ERROR: {e} (No cache available)"
 
 def poll_nodes(nodes, interval=5):
     """Function to poll multiple nodes concurrently using ThreadPoolExecutor"""

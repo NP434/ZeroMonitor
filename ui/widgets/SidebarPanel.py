@@ -17,7 +17,7 @@ class SidebarPanel:
         self.height = height
 
         self.expanded = True
-        self.animation_speed = 10
+        self.animation_speed = 20
 
         # Colors 
         self.bg_color = (28, 28, 28) 

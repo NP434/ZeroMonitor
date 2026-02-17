@@ -127,7 +127,7 @@ def load_targets() -> list:
         if not host or not user:
             raise ValueError(f"Invalid device entry (missing host or user): {item}")
 
-        conn = Connection(host=host, user=user, connect_timeout=3)
+        conn = Connection(host=host, user=user, connect_kwargs={"timeout": 5})
         if(os_type == "linux"):
             provider = LinuxMetricsProvider(conn)
         elif(os_type == "Linux"):
@@ -158,12 +158,32 @@ def poll_node(node: Node):
             return node.name, f"ERROR: {e} (No cache available)"
 
 def run_node(node: Node):
+    next_run = time.monotonic()
+    failure_count = 0
+
     while True:
         name, result = poll_node(node)
         print(name, result)
         print("-" * 60)
 
-        time.sleep(node.interval)
+        # exponential backoff logic
+        if(isinstance(result, SystemMetrics)):
+            failure_count = 0
+            interval = node.interval
+        else:
+            # doubles retry timer until it is 60 seconds max
+            failure_count += 1
+            interval = min(node.interval * (2 ** failure_count), 60)
+
+        next_run += interval
+
+        sleep_time = next_run - time.monotonic()
+        # sleep for remainder of interval
+        if sleep_time > 0:
+            time.sleep(sleep_time)
+        else:
+            # start next run now, behind schedule
+            next_run = time.monotonic()
 
 def poll_nodes(nodes):
     with ThreadPoolExecutor(max_workers=len(nodes)) as executor:

@@ -1,9 +1,9 @@
 {
     "hostname": "pihole",
-    "timestamp": "2026-02-17T15:22:38.916938",
-    "cpu_temp_c": 30.558,
-    "cpu_load_1m": 0.02,
+    "timestamp": "2026-02-17T15:36:44.166330",
+    "cpu_temp_c": 30.02,
+    "cpu_load_1m": 0.0,
     "mem_total_mb": 425,
-    "mem_used_mb": 164,
+    "mem_used_mb": 165,
     "disk_used_percent": 9.0
 }

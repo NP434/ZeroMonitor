@@ -109,27 +109,33 @@ Write-Output \"DISK=$disk\"
 class Node:
     name: str
     provider: MetricsProvider
+    interval: int
 
-nodes = [
-    Node(
-        name="AlecsPi5",
-        provider=LinuxMetricsProvider(
-            Connection(host="192.168.0.53", user="alechoelscher", connect_timeout = 3)
-        )
-    ),
-    Node(
-        name="AlecsPC",
-        provider=WindowsMetricsProvider(
-            Connection(host="192.168.0.67", user="cliff", connect_timeout = 3)
-        )
-    ),
-    Node(
-        name="Pihole",
-        provider=LinuxMetricsProvider(
-            Connection("Pihole")
-        )
-    ),
-]
+def load_targets() -> list:
+    nodes = []
+    with open("device_list.json", "r") as file:
+        data = load(file)
+    items = data.values()
+
+    for item in items:
+        host = item.get("hostname")
+        user = item.get("user")
+        name = item.get("name")
+        os_type = item.get("operating_system")
+        poll_freq = int(item.get("polling_frequency", 5))
+
+        if not host or not user:
+            raise ValueError(f"Invalid device entry (missing host or user): {item}")
+
+        conn = Connection(host=host, user=user, connect_timeout=3)
+        if(os_type == "linux"):
+            provider = LinuxMetricsProvider(conn)
+        elif(os_type == "Linux"):
+            provider = WindowsMetricsProvider(conn)
+
+        nodes.append(Node(name=name, provider=provider, interval=poll_freq))
+
+    return nodes
 
 def poll_node(node: Node):
     cache_filename = f"{node.name}_cache.json"
@@ -151,18 +157,22 @@ def poll_node(node: Node):
         except FileNotFoundError:
             return node.name, f"ERROR: {e} (No cache available)"
 
-def poll_nodes(nodes, interval=5):
-    """Function to poll multiple nodes concurrently using ThreadPoolExecutor"""
+def run_node(node: Node):
+    while True:
+        name, result = poll_node(node)
+        print(name, result)
+        print("-" * 60)
+
+        time.sleep(node.interval)
+
+def poll_nodes(nodes):
     with ThreadPoolExecutor(max_workers=len(nodes)) as executor:
+        for node in nodes:
+            executor.submit(run_node, node)
+
         while True:
-            futures = [executor.submit(poll_node, n) for n in nodes]
-
-            for f in futures:
-                name, result = f.result()
-                print(name, result)
-
-            print("-" * 60)
-            time.sleep(interval)
+            time.sleep(60)
 
 if __name__ == "__main__":
-    poll_nodes(nodes, interval=5)
+    nodes = load_targets()
+    poll_nodes(nodes)

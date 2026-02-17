@@ -7,12 +7,19 @@ initializes pygame, creates window, registers available screens, and handles swi
 between them.
 """
 import pygame
+import json
+import os
 import sys
 from ui.screens.MainScreen import MainScreen
 from ui.screens.SettingsScreen import SettingsScreen
 
 # initialize pygame
 pygame.init()
+
+def load_devices():
+    path = os.path.join("data", "devices_list_test.JSON")
+    with open(path, "r", encoding='utf-8') as file:
+        return json.load(file) 
 
 class App:
     def __init__(self):
@@ -22,6 +29,9 @@ class App:
 
         self.screen = pygame.display.set_mode((self.width, self.height))
         pygame.display.set_caption("Zero Monitor LCD UI")
+
+        # Load Devices
+        self.devices = load_devices()
 
         # Register screens
         self.screens = {

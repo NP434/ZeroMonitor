@@ -40,6 +40,8 @@ class MainScreen(BaseScreen):
         self.device_buttons = []
         self.device_scroll = 0
         self._build_device_buttons()
+        self.selected_device = None
+        self.stat_buttons = {}
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -53,7 +55,13 @@ class MainScreen(BaseScreen):
                 for btn in self.device_buttons:
                     scrolled_rect = btn.rect.move(0, self.device_scroll)
                     if scrolled_rect.collidepoint(event.pos):
-                        print("Clicked device:", btn.device["name"])
+                        self.selected_device = btn.device
+                        self._build_stat_buttons()
+
+            if self.selected_device:
+                for key, btn in self.stat_buttons.items():
+                    if btn.is_clicked(event.pos):
+                        print(f"Clicked stat: {key}")
 
         elif event.type == pygame.MOUSEWHEEL:
             self.scroll_devices(event.y)
@@ -84,16 +92,22 @@ class MainScreen(BaseScreen):
         )
         surface.blit(title_text, title_rect)
 
-        # Draw remaining contents on screen
-        pygame.draw.rect(surface, theme.GRAY, (50, 150, 924, 120))
-        text = theme.DEFAULT_FONT.render(
-            "System stats here...",
-            True,
-            theme.WHITE
-        )
-        surface.blit(text, (60, 200))
+        # Draw selected device name
+        if self.selected_device:
+            name_text = theme.DEFAULT_FONT.render(f"{self.selected_device["name"]} Stats", True, theme.WHITE)
+            name_rect = name_text.get_rect(center=(self.app.width // 2, 100))
+            surface.blit(name_text, name_rect)
 
-        # Draw Button
+        # Draw stat buttons centered
+        if self.selected_device:
+            self._layout_stat_buttons()
+            for btn in self.stat_buttons.values():
+                btn.draw(surface)
+        else:
+            placeholder = theme.DEFAULT_FONT.render("Select a device to view stats", True, theme.WHITE)
+            surface.blit(placeholder, (self.app.width // 2 - placeholder.get_width() // 200, 200))
+        
+        # Draw Settings Button
         self.settings_button.draw(surface)
 
         # --- Side Bar Elements ---
@@ -159,3 +173,38 @@ class MainScreen(BaseScreen):
             self.device_buttons.append(btn)
 
             y += button_height + 10
+
+    def _build_stat_buttons(self):
+        if not self.selected_device:
+            return
+        
+        stats = self.selected_device.get("stats", {})
+        
+        # Create the stat buttons based on keys in the stats dictionary
+        for key, value in stats.items():
+            self.stat_buttons[key] = Button(
+                rect=pygame.Rect(0,0,200,200),
+                text=f"{key}: {value}"
+            )
+
+    def _layout_stat_buttons(self):
+        if not self.selected_device:
+            return
+        
+        button_width = 200
+        button_height = 60
+        spacing = 40
+
+        count = len(self.stat_buttons)
+        total_width = count * button_width + (count - 1) * spacing
+        sidebar_width = self.sidebar.current_width
+
+        x = sidebar_width + (self.app.width - sidebar_width - total_width) // 2
+        y = self.app.height // 2
+
+        for btn in self.stat_buttons.values():
+            btn.rect.x = x
+            btn.rect.y = y
+            btn.rect.width = button_width
+            btn.rect.height = button_height
+            x += button_width + spacing

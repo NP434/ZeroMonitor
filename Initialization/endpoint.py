@@ -4,10 +4,12 @@ key transfer for the system
 """
 from flask import Flask, request,abort,send_file
 from pathlib import Path
+from secrets import token_hex
 
 BASE_DIR = Path(__file__).resolve().parent
 CERT_DIR = BASE_DIR / "certs"
 KEY_FILE = BASE_DIR / "uploaded_key.pub"
+pairing_key = token_hex(4)
 
 app = Flask(__name__)
 
@@ -24,6 +26,13 @@ def example():
         return "Storage success", 201
 
     elif request.method == "GET":
+        provided_key = request.headers.get("Pairing-Key")
+
+        print("Expected:", pairing_key)
+        print("Received:", provided_key)
+    
+        if provided_key != pairing_key:
+            abort(403, "Unauthorized")
         # Handles retreiveing data
         if not KEY_FILE.exists():
             abort(404, "No data stored")   
@@ -32,6 +41,10 @@ def example():
     return "SSH key received", 200
 
 if __name__ == "__main__":
+    print("\n Pairing Key ")
+    print(f"{pairing_key}")
+    print("-----------------")
+
     app.run(
         host="127.0.0.1",
         port=8443,

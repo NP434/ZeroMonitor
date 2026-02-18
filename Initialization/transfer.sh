@@ -34,7 +34,8 @@ curl -k -X POST \
 
 ### Retreive and store key locally ###
 echo "Retreived data \n"
-curl -k "$SERVER_URL/transfer" -o retrieved_key.pub
+read -p "Enter Pairing Key: " KEY
+curl -k -H "Pairing-Key: $KEY" "$SERVER_URL/transfer" -o retrieved_key.pub
 
 ### Retains endpoint unitl user wants it closed ###
 echo " use Ctrl + C to end session"

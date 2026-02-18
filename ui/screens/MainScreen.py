@@ -58,6 +58,7 @@ class MainScreen(BaseScreen):
                         self.selected_device = btn.device
                         self._build_stat_buttons()
 
+            # Selecting stat to show graph
             if self.selected_device:
                 for key, btn in self.stat_buttons.items():
                     if btn.is_clicked(event.pos):

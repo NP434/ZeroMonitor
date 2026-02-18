@@ -17,9 +17,11 @@ from ui.screens.SettingsScreen import SettingsScreen
 pygame.init()
 
 def load_devices():
-    path = os.path.join("data", "devices_list_test.JSON")
+    path = "device_list.json"
     with open(path, "r", encoding='utf-8') as file:
-        return json.load(file) 
+        device_data = json.load(file)
+        return list(device_data.values())
+    
 
 class App:
     def __init__(self):

@@ -30,6 +30,7 @@ import logging
 # Check to see which node is new, add it to threadpool, set it off
 # each node schedules itself and can be stopped with a flag "stop_event"
 # Each node also publishes its data to the supervisor/driver owned queue in the data format MetricsEvent
+# Each node has a persistent SSH connection that remains open during its lifetime
 #
 # If removed node
 # Stop it gracefully and delete it
@@ -83,13 +84,13 @@ class MetricsProvider(ABC):
         self.conn = conn
 
     @abstractmethod
-    def collect(self) -> SystemMetrics:
+    def collect(self, node_name: str) -> SystemMetrics:
         """Abstract method to be implemented by subclasses"""
         pass
 
 # This class collects data from a Linux system and returns a SystemMetrics object
 class LinuxMetricsProvider(MetricsProvider):
-    def collect(self) -> SystemMetrics:
+    def collect(self, node_name: str) -> SystemMetrics:
         """Linux specific metrics provider"""
         cmd = r"""
 HOST=$(hostname)
@@ -104,7 +105,7 @@ echo "LOAD=$LOAD"
 echo "MEM=$MEM"
 echo "DISK=$DISK"
 """
-        result = self.conn.run(cmd, hide=True, timeout=10)
+        result = self.conn.run(cmd, hide=True, timeout=10, node_name=node_name)
         data = {}
 
         for line in result.stdout.splitlines():
@@ -132,7 +133,7 @@ echo "DISK=$DISK"
 
 # This class collects data from a Windows system and returns a SystemMetrics object
 class WindowsMetricsProvider(MetricsProvider):
-    def collect(self) -> SystemMetrics:
+    def collect(self, node_name: str) -> SystemMetrics:
         """Windows specific metrics provider"""
         cmd = r"""
 powershell -Command "
@@ -147,7 +148,7 @@ Write-Output \"CPU=$cpu\"
 Write-Output \"MEM=$memTotal,$memFree\"
 Write-Output \"DISK=$disk\"
 """
-        result = self.conn.run(cmd, hide=True)
+        result = self.conn.run(cmd, hide=True, timeout=10, node_name=node_name)
         data = {}
 
         for line in result.stdout.splitlines():
@@ -183,6 +184,73 @@ class Node:
     # Used for exponential backoff logic
     fail_count: int = 0
 
+class PersistentConnection:
+    """Thread-safe wrapper around fabric.Connection with automatic reconnects and optional keepalive"""
+
+    def __init__(self, host: str, user: str, connect_timeout=5, max_retries=5):
+        self.host = host
+        self.user = user
+        self.connect_timeout = connect_timeout
+        self.max_retries = max_retries
+        self.conn: Optional[Connection] = None
+        self.lock = threading.Lock()  # Ensure thread-safe reconnection
+
+    def open(self):
+        """Open connection if not already open"""
+        # Lock semaphore
+        with self.lock:
+            # Create conneciton if it doesnt exist
+            if self.conn is None:
+                self.conn = Connection(
+                    host=self.host,
+                    user=self.user,
+                    connect_timeout=self.connect_timeout
+                )
+
+    def run(self, cmd, node_name=None, **kwargs):
+        """Run a command with automatic reconnect and retries"""
+        retries = 0
+        # If we are under max retries
+        while retries < self.max_retries:
+            try:
+                # Try to open connection
+                self.open()
+                # return successful connection
+                return self.conn.run(cmd, **kwargs)
+            except Exception as e:
+                # else, record error, and retry
+                name = node_name if node_name else self.host
+                logging.warning(
+                    "[%s] SSH command failed: %s (retry %d/%d)",
+                    name, e, retries + 1, self.max_retries
+                )
+                retries += 1
+                # Close the connection and retry
+                with self.lock:
+                    if self.conn:
+                        try:
+                            self.conn.close()
+                        except Exception:
+                            pass
+                        self.conn = None
+                # exponential backoff for connection retries, max 10 seconds
+                time.sleep(min(2 ** retries, 10))
+
+        name = node_name if node_name else self.host
+        raise RuntimeError(f"SSH connection to {name} failed after {self.max_retries} retries")
+
+    def close(self):
+        """Close connection explicitly"""
+        # Lock Semaphore
+        with self.lock:
+            # Repeatedly close connection
+            if self.conn:
+                try:
+                    self.conn.close()
+                except Exception:
+                    pass
+                self.conn = None
+
 # Load and initialize targets from device_list.json
 def load_targets() -> list:
     """Function to load and initialize targets from device_list.json"""
@@ -198,7 +266,7 @@ def load_targets() -> list:
         os_type = item.get("operating_system")
         poll_freq = int(item.get("polling_frequency", 5))
 
-        conn = Connection(host=host, user=user, connect_timeout=5)
+        conn = PersistentConnection(host=host, user=user)
         if(os_type.lower() == "linux"):
             provider = LinuxMetricsProvider(conn)
         elif(os_type.lower() == "windows"):
@@ -223,56 +291,66 @@ def run_node(node: Node, queue: Queue):
 
     stop_event = node.stop_event
     interval = node.interval
+    conn = node.provider.conn
 
     # schedule first run immediately
     next_run = time.monotonic()
 
-    # Main worker loop
-    while True:
+    try:
+        # Main worker loop
+        while True:
 
-        # Kill worker thread when stop_event flag is set
-        if stop_event.is_set():
-            print(f"[{node.name}] stopping worker")
-            return
-
-        now = time.monotonic()
-
-        # Calculate time until next scheduled run
-        wait_time = next_run - now
-        # Wait until next scheduled run 
-        if wait_time > 0:
-            # wait() returns True if stop_event triggered
-            if stop_event.wait(wait_time):
-                print(f"[{node.name}] stopped during wait")
+            # Kill worker thread when stop_event flag is set
+            if stop_event.is_set():
+                logger.info("Worker stopping")
                 return
 
-        # If wait time is over, try to collect metrics
+            now = time.monotonic()
+
+            # Calculate time until next scheduled run
+            wait_time = next_run - now
+            # Wait until next scheduled run 
+            if wait_time > 0:
+                # wait() returns True if stop_event triggered
+                if stop_event.wait(wait_time):
+                    print(f"[{node.name}] stopped during wait")
+                    return
+
+            # If wait time is over, try to collect metrics
+            try:
+                metrics = node.provider.collect(node.name)
+                logger.info("metrics collected successfully for %s", node.name)
+                queue.put(MetricEvent(
+                    node=node.name,
+                    success=True,
+                    payload=asdict(metrics),
+                    timestamp=datetime.now().isoformat()
+                ))
+
+            # If collection fails, gracefully handle and display reason
+            except Exception as e:
+                logger.warning("collection failed: %s", e)
+                queue.put(MetricEvent(
+                    node=node.name,
+                    success=False,
+                    payload={"error": str(e)},
+                    timestamp=datetime.now().isoformat()
+                ))
+
+            # Schedule the next execution time (avoid timing drift)
+            next_run += interval
+
+            # If collection took too long, schedule now
+            if next_run < time.monotonic():
+                next_run = time.monotonic()
+
+    # Exit that runs no matter what to close persistent ssh connection
+    finally:
+        logger.info("Closing SSH connection")
         try:
-            metrics = node.provider.collect()
-            logger.info("metrics collected successfully")
-            queue.put(MetricEvent(
-                node=node.name,
-                success=True,
-                payload=asdict(metrics),
-                timestamp=datetime.now().isoformat()
-            ))
-
-        # If collection fails, gracefully handle and display reason
-        except Exception as e:
-            logger.warning("collection failed: %s", e)
-            queue.put(MetricEvent(
-                node=node.name,
-                success=False,
-                payload={"error": str(e)},
-                timestamp=datetime.now().isoformat()
-            ))
-
-        # Schedule the next execution time (avoid timing drift)
-        next_run += interval
-
-        # If collection took too long, schedule now
-        if next_run < time.monotonic():
-            next_run = time.monotonic()
+            conn.close()
+        except Exception:
+            pass
 
 # Driver class, to be migrated to driver module (seperate file with access to UI and polling agent methods)
 class Supervisor:
@@ -377,18 +455,17 @@ class Supervisor:
 # Later, this function will be adapted to be the Data intepreter, which will 
 # Consume data from queue, interpret it, and put it into another queue for the UI
 def metrics_consumer(queue):
-    """Function to recieve metrics from the supervisor/drivers queue"""
+    """Function to receive metrics from the supervisor/driver queue"""
     while True:
-        # Pull next event in queue
         event = queue.get()
 
-        # If successful, write data to cache
         if event.success:
             filename = f"{event.node}_cache.json"
             with open(filename, "w") as f:
                 dump(event.payload, f, indent=4)
-        # Log cache update
-        log_consumer.info("cache updated: %s", event.node)
+            log_consumer.info("cache updated: %s", event.node)
+        else:
+            log_consumer.warning("metrics failed for %s: %s", event.node, event.payload.get("error"))
 
 # Main entry into program, will likely function similarly in final driver code
 if __name__ == "__main__":

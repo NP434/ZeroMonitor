@@ -2,11 +2,71 @@ from dataclasses import dataclass, asdict
 from typing import Optional
 from abc import ABC, abstractmethod
 from fabric import Connection
-import time
 from concurrent.futures import ThreadPoolExecutor
 from json import dump, load
+import time
 from datetime import datetime
+from queue import Queue
+import threading
+import os
+import logging
 
+# Architecture as it exists:
+
+# Supervisor class: Acting as driver
+# Runs two controller servicers:
+# metrics consumer (Data interpreter), 
+# and config watcher (this module will stay in driver)
+#
+# config watcher checks to see if device_list (later full config file) has changed
+# performs updates accordingly
+#
+# if device_list has changed, config watcher calls reconcile to make the current state
+# of execution match the current configuration
+#
+# Reconcile function handles addition of new nodes, removal of nodes, or changes to node settings
+# 
+# If new node
+# Check to see which node is new, add it to threadpool, set it off
+# each node schedules itself and can be stopped with a flag "stop_event"
+# Each node also publishes its data to the supervisor/driver owned queue in the data format MetricsEvent
+#
+# If removed node
+# Stop it gracefully and delete it
+#
+# If node settings has changed
+# Relaunch them with updated settings
+# 
+# Metrics consumer will later be implmeneted as the "Data Interpreter" module
+# It will 1. Pull MetricsEvents from Supervisor/Driver owned queue, 2. interpret them 
+# (compare with thresholds, add to cache if successful, get everything ready for display)
+# and 3. push these interpreted metrics into another queue that will go directly to the UI
+
+# Standardized logging format
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-7s | %(message)s",
+    datefmt="%H:%M:%S",
+)
+
+# Create unique loggers for each segment 
+log_supervisor = logging.getLogger("supervisor")
+log_worker = logging.getLogger("worker")
+log_consumer = logging.getLogger("consumer")
+
+# This object is passed to the data queue and includes system metrics
+@dataclass
+class MetricEvent:
+    # Common name of node
+    node: str
+    # Status of last polling attempt
+    success: bool
+    # Metrics data
+    payload: dict
+    # Timestamp
+    timestamp: str
+
+# This object is the direct result of metrics collection
 @dataclass
 class SystemMetrics:
     hostname: str
@@ -17,6 +77,7 @@ class SystemMetrics:
     mem_used_mb: Optional[int]
     disk_used_percent: Optional[float]
 
+# Abstract base class for all operating systems to be implmeneted
 class MetricsProvider(ABC):
     def __init__(self, conn: Connection):
         self.conn = conn
@@ -26,6 +87,7 @@ class MetricsProvider(ABC):
         """Abstract method to be implemented by subclasses"""
         pass
 
+# This class collects data from a Linux system and returns a SystemMetrics object
 class LinuxMetricsProvider(MetricsProvider):
     def collect(self) -> SystemMetrics:
         """Linux specific metrics provider"""
@@ -42,7 +104,7 @@ echo "LOAD=$LOAD"
 echo "MEM=$MEM"
 echo "DISK=$DISK"
 """
-        result = self.conn.run(cmd, hide=True)                      # ADD BACK after cmd.    , hide=True
+        result = self.conn.run(cmd, hide=True, timeout=10)
         data = {}
 
         for line in result.stdout.splitlines():
@@ -68,8 +130,10 @@ echo "DISK=$DISK"
             disk_used_percent=float(data["DISK"].replace("%", "")),
         )
 
+# This class collects data from a Windows system and returns a SystemMetrics object
 class WindowsMetricsProvider(MetricsProvider):
     def collect(self) -> SystemMetrics:
+        """Windows specific metrics provider"""
         cmd = r"""
 powershell -Command "
 $hostn = hostname
@@ -105,13 +169,23 @@ Write-Output \"DISK=$disk\"
             disk_used_percent=float(data["DISK"]),
         )
 
+# This class represents a single target device
 @dataclass
 class Node:
+    # Common Name
     name: str
+    # OS Specific MetricsProvider object (already contains hostname)
     provider: MetricsProvider
+    # Configurable Polling Interval
     interval: int
+    # Used to stop/start/restart nodes when config changes
+    stop_event: threading.Event | None = None
+    # Used for exponential backoff logic
+    fail_count: int = 0
 
+# Load and initialize targets from device_list.json
 def load_targets() -> list:
+    """Function to load and initialize targets from device_list.json"""
     nodes = []
     with open("device_list.json", "r") as file:
         data = load(file)
@@ -124,75 +198,201 @@ def load_targets() -> list:
         os_type = item.get("operating_system")
         poll_freq = int(item.get("polling_frequency", 5))
 
-        if not host or not user:
-            raise ValueError(f"Invalid device entry (missing host or user): {item}")
-
-        conn = Connection(host=host, user=user, connect_kwargs={"timeout": 5})
-        if(os_type == "linux"):
+        conn = Connection(host=host, user=user, connect_timeout=5)
+        if(os_type.lower() == "linux"):
             provider = LinuxMetricsProvider(conn)
-        elif(os_type == "Linux"):
+        elif(os_type.lower() == "windows"):
             provider = WindowsMetricsProvider(conn)
+        else:
+            # Gracefully handle error if OS is unsupported
+            log_supervisor.warning(
+                "Skipping node '%s' — unsupported OS '%s'",
+                name,
+                os_type,
+            )
+            continue
 
         nodes.append(Node(name=name, provider=provider, interval=poll_freq))
-
+    # Returns list of node objects
     return nodes
 
-def poll_node(node: Node):
-    cache_filename = f"{node.name}_cache.json"
-    try:
-        metrics = node.provider.collect()
-        
-        # Save data to cache
-        with open(cache_filename, "w") as file:
-            dump(asdict(metrics), file, indent=4)
-            
-        return node.name, metrics
+def run_node(node: Node, queue: Queue):
+    """Worker thread loop for a single node"""
+    # Create logger for specific worker thread
+    logger = logging.getLogger(f"worker.{node.name}")
 
-    except Exception as e:
-        # Try to load the last successful data from the cache
-        try:
-            with open(cache_filename, "r") as file:
-                cached_data = load(file)
-            return node.name, f"OFFLINE (Cache from {cached_data.get('timestamp')}): {cached_data}"
-        except FileNotFoundError:
-            return node.name, f"ERROR: {e} (No cache available)"
+    stop_event = node.stop_event
+    interval = node.interval
 
-def run_node(node: Node):
+    # schedule first run immediately
     next_run = time.monotonic()
-    failure_count = 0
 
+    # Main worker loop
     while True:
-        name, result = poll_node(node)
-        print(name, result)
-        print("-" * 60)
 
-        # exponential backoff logic
-        if(isinstance(result, SystemMetrics)):
-            failure_count = 0
-            interval = node.interval
-        else:
-            # doubles retry timer until it is 60 seconds max
-            failure_count += 1
-            interval = min(node.interval * (2 ** failure_count), 60)
+        # Kill worker thread when stop_event flag is set
+        if stop_event.is_set():
+            print(f"[{node.name}] stopping worker")
+            return
 
+        now = time.monotonic()
+
+        # Calculate time until next scheduled run
+        wait_time = next_run - now
+        # Wait until next scheduled run 
+        if wait_time > 0:
+            # wait() returns True if stop_event triggered
+            if stop_event.wait(wait_time):
+                print(f"[{node.name}] stopped during wait")
+                return
+
+        # If wait time is over, try to collect metrics
+        try:
+            metrics = node.provider.collect()
+            logger.info("metrics collected successfully")
+            queue.put(MetricEvent(
+                node=node.name,
+                success=True,
+                payload=asdict(metrics),
+                timestamp=datetime.now().isoformat()
+            ))
+
+        # If collection fails, gracefully handle and display reason
+        except Exception as e:
+            logger.warning("collection failed: %s", e)
+            queue.put(MetricEvent(
+                node=node.name,
+                success=False,
+                payload={"error": str(e)},
+                timestamp=datetime.now().isoformat()
+            ))
+
+        # Schedule the next execution time (avoid timing drift)
         next_run += interval
 
-        sleep_time = next_run - time.monotonic()
-        # sleep for remainder of interval
-        if sleep_time > 0:
-            time.sleep(sleep_time)
-        else:
-            # start next run now, behind schedule
+        # If collection took too long, schedule now
+        if next_run < time.monotonic():
             next_run = time.monotonic()
 
-def poll_nodes(nodes):
-    with ThreadPoolExecutor(max_workers=len(nodes)) as executor:
-        for node in nodes:
-            executor.submit(run_node, node)
+# Driver class, to be migrated to driver module (seperate file with access to UI and polling agent methods)
+class Supervisor:
+    def __init__(self):
+            # Group of workers
+            self.workers = {}
+
+            # Queue where all metrics providers output their collected metrics
+            self.queue = Queue()
+
+            # Control Threads
+            self.control_executor = ThreadPoolExecutor(max_workers=2)
+
+            # polling workers
+            self.worker_executor = ThreadPoolExecutor(max_workers=50)
+
+    def start(self):
+        """Function to launch all control threads"""
+        # Creates two worker threads, one to consume metrics (This will later be the Data Interpreter Module)
+        self.control_executor.submit(metrics_consumer, self.queue)
+        # And another to watch for config updates and update worker threads accordingly
+        self.control_executor.submit(self.watch_config)
+
+# Later, this function will need to handle first launch vs. regular launch behavior
+# Check config, its empty? first launch routine, its got information? run as usual and revert state
+    def watch_config(self):
+        """Function to check config and launch worker threads accordingly"""
+
+        # Variable to store the last time that device_list.json was modified
+        last_mtime = 0 
 
         while True:
-            time.sleep(60)
+            try:
+                # Check if device_list was changed
+                mtime = os.path.getmtime("device_list.json")
 
+                # If it has been changed
+                if mtime != last_mtime:
+                    # Record the time, relaunch worker threads
+                    last_mtime = mtime
+                    log_supervisor.info("Config changed — reloading")
+
+                    # Update node list, reconcile targets
+                    nodes = load_targets()
+                    self.reconcile(nodes)
+
+            except Exception as e:
+                log_supervisor.error("Config reload failed: %s", e)
+
+            time.sleep(2)
+
+    # Reconcile function allows for hot-reload behavior for node monitoring
+    # compares the active workers managed by the Superviser against the nodes defined in the newly loaded configuration file 
+    # performs actions to synchronize them 
+    def reconcile(self, new_nodes):
+        """Function to reconcile the currently running worker set with the latest configuration"""
+        # Gather information about current node list, and new node list
+        new_map = {n.name: n for n in new_nodes}
+        current_names = set(self.workers.keys())
+        new_names = set(new_map.keys())
+
+        # This block starts any new nodes that have been added
+        for name in new_names - current_names:
+            # Create node
+            node = new_map[name]
+            # Create its own stop_event object that can be invoked with .set()
+            node.stop_event = threading.Event()
+
+            # Submit new node to worker_executor pool
+            future = self.worker_executor.submit(run_node, node, self.queue)
+
+            # Add node to supervisor/driver worker list
+            self.workers[name] = (node, future)
+            log_supervisor.info("Started worker: %s", name)
+
+        # This block removes any nodes that have been removed from device_list
+        for name in current_names - new_names:
+            # Pop that node from workers list
+            node, future = self.workers.pop(name)
+            # Trigger that nodes stop event
+            node.stop_event.set()
+            log_supervisor.info("Stopping worker: %s", name)
+
+        # This block checks for any updated configuration for existing nodes (ie polling interval changes)
+        for name in new_names & current_names:
+            old_node, _ = self.workers[name]
+            new_node = new_map[name]
+
+            # Currently only interval changes require restart
+            if new_node.interval != old_node.interval:
+                log_supervisor.info("Reloading worker: %s", name)
+
+                # Stop old worker gracefully
+                old_node.stop_event.set()
+
+                # Start replacement worker with new settings
+                new_node.stop_event = threading.Event()
+                future = self.worker_executor.submit(run_node, new_node, self.queue)
+
+                self.workers[name] = (new_node, future)
+
+# Later, this function will be adapted to be the Data intepreter, which will 
+# Consume data from queue, interpret it, and put it into another queue for the UI
+def metrics_consumer(queue):
+    """Function to recieve metrics from the supervisor/drivers queue"""
+    while True:
+        # Pull next event in queue
+        event = queue.get()
+
+        # If successful, write data to cache
+        if event.success:
+            filename = f"{event.node}_cache.json"
+            with open(filename, "w") as f:
+                dump(event.payload, f, indent=4)
+        # Log cache update
+        log_consumer.info("cache updated: %s", event.node)
+
+# Main entry into program, will likely function similarly in final driver code
 if __name__ == "__main__":
-    nodes = load_targets()
-    poll_nodes(nodes)
+    Supervisor().start()
+
+    while True:
+        time.sleep(60)

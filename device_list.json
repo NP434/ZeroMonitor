@@ -19,5 +19,12 @@
         "user": "admin",
         "operating_system": "linux",
         "polling_frequency": "5"
+    },
+    "target_four": {
+        "name": "PiDummy",
+        "hostname": "192.168.0.00",
+        "user": "bleh",
+        "operating_system": "macOS",
+        "polling_frequency": "5"
     }
 }

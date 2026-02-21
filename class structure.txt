@@ -1,0 +1,61 @@
+main.py -> 
+    Starts other modules
+
+driver.py ->
+    Class Driver
+        __init__(self, EventBus)
+        start(self)
+        update_polling_rate(self, payload)
+        _handle_remove_node(self, payload)
+        remove_node(self, node_name)
+        stop_system
+        add_node(self, node_config)
+        _dispatch_method(self)
+        reload_config(self)
+    load_targets()
+
+polling_agent.py ->
+    Class SystemMetrics
+    Class MetricEvent
+    Class Node
+    Class MetricsProvider(ABC)
+        __init__(conn)
+        collect
+    Class LinuxMetricsProvider(MetricsProvider)
+        collect
+    Class WindowsMetricsProvider(MetricsProvider)
+        collect
+    Class PersistentConnection
+        __init__(self, host, user, timeout, max_retries)
+        open(self)
+        run(self, cmd, node_name, stop_event, kwargs)
+        close(self)
+    Class PollingAgent
+        __init__(self, queue)
+        launch_nodes(self, nodes)
+        reconcile(self, new_nodes)
+        add_node(self, node)
+        remove_node(self, name)
+        update_node(self, new_map, name)
+        stop_all_nodes(self)
+        shutdown(self)
+    run_node(node, queue)
+
+ui_module.py ->
+    Class UI
+        __init__(self, EventBus)
+        change_polling_rate(self, host, new_rate)
+        
+        # These three methods are hardly defined
+        add_node(self)
+        remove_node(self)
+        stop_system(self)
+
+event_bus.py ->
+    Class EventBus 
+        __init__(self)
+        subscribe(self, event_type, handler)
+        publish(self, event_type, data)
+        start(self)
+        stop(self)
+        _event_loop(self)

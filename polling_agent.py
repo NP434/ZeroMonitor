@@ -1,71 +1,13 @@
+import threading
+import logging
+import time
 from dataclasses import dataclass, asdict
 from typing import Optional
 from abc import ABC, abstractmethod
 from fabric import Connection
-from concurrent.futures import ThreadPoolExecutor
-from json import dump, load
-import time
 from datetime import datetime
 from queue import Queue
-import threading
-import os
-import logging
-
-# Architecture as it exists:
-
-# Supervisor class: Acting as driver
-# Runs two controller servicers:
-# metrics consumer (Data interpreter), 
-# and config watcher (this module will stay in driver)
-#
-# config watcher checks to see if device_list (later full config file) has changed
-# performs updates accordingly
-#
-# if device_list has changed, config watcher calls reconcile to make the current state
-# of execution match the current configuration
-#
-# Reconcile function handles addition of new nodes, removal of nodes, or changes to node settings
-# 
-# If new node
-# Check to see which node is new, add it to threadpool, set it off
-# each node schedules itself and can be stopped with a flag "stop_event"
-# Each node also publishes its data to the supervisor/driver owned queue in the data format MetricsEvent
-# Each node has a persistent SSH connection that remains open during its lifetime
-#
-# If removed node
-# Stop it gracefully and delete it
-#
-# If node settings has changed
-# Relaunch them with updated settings
-# 
-# Metrics consumer will later be implmeneted as the "Data Interpreter" module
-# It will 1. Pull MetricsEvents from Supervisor/Driver owned queue, 2. interpret them 
-# (compare with thresholds, add to cache if successful, get everything ready for display)
-# and 3. push these interpreted metrics into another queue that will go directly to the UI
-
-# Standardized logging format
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)-7s | %(message)s",
-    datefmt="%H:%M:%S",
-)
-
-# Create unique loggers for each segment 
-log_supervisor = logging.getLogger("supervisor")
-log_worker = logging.getLogger("worker")
-log_consumer = logging.getLogger("consumer")
-
-# This object is passed to the data queue and includes system metrics
-@dataclass
-class MetricEvent:
-    # Common name of node
-    node: str
-    # Status of last polling attempt
-    success: bool
-    # Metrics data
-    payload: dict
-    # Timestamp
-    timestamp: str
+from concurrent.futures import ThreadPoolExecutor
 
 # This object is the direct result of metrics collection
 @dataclass
@@ -78,19 +20,45 @@ class SystemMetrics:
     mem_used_mb: Optional[int]
     disk_used_percent: Optional[float]
 
+# This object is passed to the metrics queue and includes system metrics
+@dataclass
+class MetricEvent:
+    # Common name of node
+    node: str
+    # Status of last polling attempt
+    success: bool
+    # Metrics data
+    payload: dict
+    # Timestamp
+    timestamp: str
+
 # Abstract base class for all operating systems to be implmeneted
 class MetricsProvider(ABC):
     def __init__(self, conn: Connection):
         self.conn = conn
 
     @abstractmethod
-    def collect(self, node_name: str) -> SystemMetrics:
+    def collect(self, node_name: str, stop_event=None) -> SystemMetrics:
         """Abstract method to be implemented by subclasses"""
         pass
 
+# This class represents a single target device
+@dataclass
+class Node:
+    # Common Name
+    name: str
+    # OS Specific MetricsProvider object (already contains hostname)
+    provider: MetricsProvider
+    # Configurable Polling Interval
+    interval: int
+    # Used to stop/start/restart nodes when config changes
+    stop_event: threading.Event | None = None
+    # Used for exponential backoff logic
+    fail_count: int = 0
+
 # This class collects data from a Linux system and returns a SystemMetrics object
 class LinuxMetricsProvider(MetricsProvider):
-    def collect(self, node_name: str) -> SystemMetrics:
+    def collect(self, node_name: str, stop_event=None) -> SystemMetrics:
         """Linux specific metrics provider"""
         cmd = r"""
 HOST=$(hostname)
@@ -105,7 +73,13 @@ echo "LOAD=$LOAD"
 echo "MEM=$MEM"
 echo "DISK=$DISK"
 """
-        result = self.conn.run(cmd, hide=True, timeout=10, node_name=node_name)
+        result = self.conn.run(
+            cmd,
+            hide=True,
+            timeout=10,
+            node_name=node_name,
+            stop_event=stop_event
+        )
         data = {}
 
         for line in result.stdout.splitlines():
@@ -119,7 +93,9 @@ echo "DISK=$DISK"
             else None
         )
 
-        mem_total, mem_used = map(int, data["MEM"].split(","))
+        mem_total = mem_used = None
+        if "MEM" in data and "," in data["MEM"]:    
+            mem_total, mem_used = map(int, data["MEM"].split(","))
 
         return SystemMetrics(
             hostname=data["HOST"],
@@ -130,10 +106,10 @@ echo "DISK=$DISK"
             mem_used_mb=mem_used,
             disk_used_percent=float(data["DISK"].replace("%", "")),
         )
-
+    
 # This class collects data from a Windows system and returns a SystemMetrics object
 class WindowsMetricsProvider(MetricsProvider):
-    def collect(self, node_name: str) -> SystemMetrics:
+    def collect(self, node_name: str, stop_event=None) -> SystemMetrics:
         """Windows specific metrics provider"""
         cmd = r"""
 powershell -Command "
@@ -148,7 +124,13 @@ Write-Output \"CPU=$cpu\"
 Write-Output \"MEM=$memTotal,$memFree\"
 Write-Output \"DISK=$disk\"
 """
-        result = self.conn.run(cmd, hide=True, timeout=10, node_name=node_name)
+        result = self.conn.run(
+            cmd,
+            hide=True,
+            timeout=10,
+            node_name=node_name,
+            stop_event=stop_event
+        )
         data = {}
 
         for line in result.stdout.splitlines():
@@ -169,31 +151,19 @@ Write-Output \"DISK=$disk\"
             mem_used_mb=mem_used,
             disk_used_percent=float(data["DISK"]),
         )
+    
 
-# This class represents a single target device
-@dataclass
-class Node:
-    # Common Name
-    name: str
-    # OS Specific MetricsProvider object (already contains hostname)
-    provider: MetricsProvider
-    # Configurable Polling Interval
-    interval: int
-    # Used to stop/start/restart nodes when config changes
-    stop_event: threading.Event | None = None
-    # Used for exponential backoff logic
-    fail_count: int = 0
-
+# This class maintains a persistent ssh session with targets to reduce polling overhead 
 class PersistentConnection:
-    """Thread-safe wrapper around fabric.Connection with automatic reconnects and optional keepalive"""
-
+    """Persistent connection to reduce SSH overhead"""
     def __init__(self, host: str, user: str, connect_timeout=5, max_retries=5):
         self.host = host
         self.user = user
         self.connect_timeout = connect_timeout
         self.max_retries = max_retries
         self.conn: Optional[Connection] = None
-        self.lock = threading.Lock()  # Ensure thread-safe reconnection
+        # Semaphore for thread safety
+        self.lock = threading.Lock() 
 
     def open(self):
         """Open connection if not already open"""
@@ -207,7 +177,7 @@ class PersistentConnection:
                     connect_timeout=self.connect_timeout
                 )
 
-    def run(self, cmd, node_name=None, **kwargs):
+    def run(self, cmd, node_name=None, stop_event=None, **kwargs):
         """Run a command with automatic reconnect and retries"""
         retries = 0
         # If we are under max retries
@@ -234,7 +204,12 @@ class PersistentConnection:
                             pass
                         self.conn = None
                 # exponential backoff for connection retries, max 10 seconds
-                time.sleep(min(2 ** retries, 10))
+                sleep_time = min(2 ** retries, 10)
+
+                if stop_event and stop_event.wait(sleep_time):
+                    raise RuntimeError("Command aborted due to shutdown")
+                else:
+                    time.sleep(sleep_time)
 
         name = node_name if node_name else self.host
         raise RuntimeError(f"SSH connection to {name} failed after {self.max_retries} retries")
@@ -251,49 +226,106 @@ class PersistentConnection:
                     pass
                 self.conn = None
 
-# Load and initialize targets from device_list.json
-def load_targets() -> list:
-    """Function to load and initialize targets from device_list.json"""
-    nodes = []
-    with open("device_list.json", "r") as file:
-        data = load(file)
-    items = data.values()
+# This class handles polling nodes, it is created and owned by driver
+# Driver will use this manager to handle the collection of metrics from targets
+# Has various methods relating to all things polling
+class PollingAgent:
+    """Manages worker threads for polling nodes"""
+    def __init__(self, queue: Queue):
+        self.workers = {}  # node_name -> (Node, Future)
+        self.worker_executor = ThreadPoolExecutor(max_workers=50)
+        self.queue = queue
 
-    for item in items:
-        host = item.get("hostname")
-        user = item.get("user")
-        name = item.get("name")
-        os_type = item.get("operating_system")
-        poll_freq = int(item.get("polling_frequency", 5))
+    def launch_nodes(self, nodes: list[Node]):
+        """Function to start polling all nodes"""
+        self.reconcile(nodes)
 
-        conn = PersistentConnection(host=host, user=user)
-        if(os_type.lower() == "linux"):
-            provider = LinuxMetricsProvider(conn)
-        elif(os_type.lower() == "windows"):
-            provider = WindowsMetricsProvider(conn)
-        else:
-            # Gracefully handle error if OS is unsupported
-            log_supervisor.warning(
-                "Skipping node '%s' — unsupported OS '%s'",
-                name,
-                os_type,
-            )
-            continue
+    def reconcile(self, new_nodes):
+        """Function to reconcile the currently running worker set with the latest configuration"""
+        # Gather information about current node list, and new node list
+        new_map = {n.name: n for n in new_nodes}
+        current_names = set(self.workers.keys())
+        new_names = set(new_map.keys())
 
-        nodes.append(Node(name=name, provider=provider, interval=poll_freq))
-    # Returns list of node objects
-    return nodes
+        # This block starts any new nodes that have been added
+        for name in new_names - current_names:
+            self.add_node(new_map[name])
+
+        # This block removes any nodes that have been removed from device_list
+        for name in current_names - new_names:
+            self.remove_node(name)
+
+        # This block checks for any updated configuration for existing nodes (ie polling interval changes)
+        for name in new_names & current_names:
+            self.update_node(new_map, name)
+    
+    def add_node(self, node: Node):
+        """Function to add a polling target"""
+        # Create the nodes stop_event
+        node.stop_event = threading.Event()
+
+        # Add worker thread to threadpool
+        future = self.worker_executor.submit(run_node, node, self.queue)
+
+        # Add worker thread to active workers list
+        self.workers[node.name] = (node, future)
+        logging.info("Started worker: %s", node.name)
+
+    def remove_node(self, name: str):
+        """Function to remove an active node"""
+        # Remove node from active workers list
+        entry = self.workers.pop(name, None)
+
+        # If invalid, stop
+        if not entry:
+            return
+
+        # Stop the node itself by setting stop_event
+        node, future = entry
+        node.stop_event.set()
+        logging.info("Stopping worker: %s", name)
+
+    def update_node(self, new_map: dict, name: str):
+        """Function to update a nodes configuration"""
+        old_node, _ = self.workers[name]
+        new_node = new_map[name]
+
+        # If interval has changed, reload worker with new settings
+        if new_node.interval != old_node.interval:
+            logging.info("Reloading worker: %s", name)
+            # Stop old node
+            old_node.stop_event.set()
+
+            # Create new_nodes stop event
+            new_node.stop_event = threading.Event()
+
+            # Add worker thread to threadpool, start it
+            future = self.worker_executor.submit(run_node, new_node, self.queue)
+
+            # Add worker to active workers list
+            self.workers[name] = (new_node, future)
+
+    def stop_all_nodes(self):
+        """Function to stop polling all nodes"""
+        for name in list(self.workers.keys()):
+            self.remove_node(name)
+
+    def shutdown(self):
+        """Fully shutdown executor"""
+        self.stop_all_nodes()
+        self.worker_executor.shutdown(wait=True, cancel_futures=True)
 
 def run_node(node: Node, queue: Queue):
     """Worker thread loop for a single node"""
     # Create logger for specific worker thread
     logger = logging.getLogger(f"worker.{node.name}")
 
+    # Load variables from specific node
     stop_event = node.stop_event
     interval = node.interval
     conn = node.provider.conn
 
-    # schedule first run immediately
+    # Schedule first run immediately
     next_run = time.monotonic()
 
     try:
@@ -311,15 +343,19 @@ def run_node(node: Node, queue: Queue):
             wait_time = next_run - now
             # Wait until next scheduled run 
             if wait_time > 0:
-                # wait() returns True if stop_event triggered
+                # wait() returns True if stop_event triggered, immediately shuts down workers if stop_event is set
                 if stop_event.wait(wait_time):
-                    print(f"[{node.name}] stopped during wait")
+                    logger.info("Worker stopped during wait")
                     return
 
             # If wait time is over, try to collect metrics
             try:
-                metrics = node.provider.collect(node.name)
+                metrics = node.provider.collect(
+                    node.name,
+                    stop_event=stop_event
+                )
                 logger.info("metrics collected successfully for %s", node.name)
+                # Put metrics in the queue
                 queue.put(MetricEvent(
                     node=node.name,
                     success=True,
@@ -351,125 +387,3 @@ def run_node(node: Node, queue: Queue):
             conn.close()
         except Exception:
             pass
-
-# Driver class, to be migrated to driver module (seperate file with access to UI and polling agent methods)
-class Supervisor:
-    def __init__(self):
-            # Group of workers
-            self.workers = {}
-
-            # Queue where all metrics providers output their collected metrics
-            self.queue = Queue()
-
-            # Control Threads
-            self.control_executor = ThreadPoolExecutor(max_workers=2)
-
-            # polling workers
-            self.worker_executor = ThreadPoolExecutor(max_workers=50)
-
-    def start(self):
-        """Function to launch all control threads"""
-        # Creates two worker threads, one to consume metrics (This will later be the Data Interpreter Module)
-        self.control_executor.submit(metrics_consumer, self.queue)
-        # And another to watch for config updates and update worker threads accordingly
-        self.control_executor.submit(self.watch_config)
-
-# Later, this function will need to handle first launch vs. regular launch behavior
-# Check config, its empty? first launch routine, its got information? run as usual and revert state
-    def watch_config(self):
-        """Function to check config and launch worker threads accordingly"""
-
-        # Variable to store the last time that device_list.json was modified
-        last_mtime = 0 
-
-        while True:
-            try:
-                # Check if device_list was changed
-                mtime = os.path.getmtime("device_list.json")
-
-                # If it has been changed
-                if mtime != last_mtime:
-                    # Record the time, relaunch worker threads
-                    last_mtime = mtime
-                    log_supervisor.info("Config changed — reloading")
-
-                    # Update node list, reconcile targets
-                    nodes = load_targets()
-                    self.reconcile(nodes)
-
-            except Exception as e:
-                log_supervisor.error("Config reload failed: %s", e)
-
-            time.sleep(2)
-
-    # Reconcile function allows for hot-reload behavior for node monitoring
-    # compares the active workers managed by the Superviser against the nodes defined in the newly loaded configuration file 
-    # performs actions to synchronize them 
-    def reconcile(self, new_nodes):
-        """Function to reconcile the currently running worker set with the latest configuration"""
-        # Gather information about current node list, and new node list
-        new_map = {n.name: n for n in new_nodes}
-        current_names = set(self.workers.keys())
-        new_names = set(new_map.keys())
-
-        # This block starts any new nodes that have been added
-        for name in new_names - current_names:
-            # Create node
-            node = new_map[name]
-            # Create its own stop_event object that can be invoked with .set()
-            node.stop_event = threading.Event()
-
-            # Submit new node to worker_executor pool
-            future = self.worker_executor.submit(run_node, node, self.queue)
-
-            # Add node to supervisor/driver worker list
-            self.workers[name] = (node, future)
-            log_supervisor.info("Started worker: %s", name)
-
-        # This block removes any nodes that have been removed from device_list
-        for name in current_names - new_names:
-            # Pop that node from workers list
-            node, future = self.workers.pop(name)
-            # Trigger that nodes stop event
-            node.stop_event.set()
-            log_supervisor.info("Stopping worker: %s", name)
-
-        # This block checks for any updated configuration for existing nodes (ie polling interval changes)
-        for name in new_names & current_names:
-            old_node, _ = self.workers[name]
-            new_node = new_map[name]
-
-            # Currently only interval changes require restart
-            if new_node.interval != old_node.interval:
-                log_supervisor.info("Reloading worker: %s", name)
-
-                # Stop old worker gracefully
-                old_node.stop_event.set()
-
-                # Start replacement worker with new settings
-                new_node.stop_event = threading.Event()
-                future = self.worker_executor.submit(run_node, new_node, self.queue)
-
-                self.workers[name] = (new_node, future)
-
-# Later, this function will be adapted to be the Data intepreter, which will 
-# Consume data from queue, interpret it, and put it into another queue for the UI
-def metrics_consumer(queue):
-    """Function to receive metrics from the supervisor/driver queue"""
-    while True:
-        event = queue.get()
-
-        if event.success:
-            filename = f"{event.node}_cache.json"
-            with open(filename, "w") as f:
-                dump(event.payload, f, indent=4)
-            log_consumer.info("cache updated: %s", event.node)
-        else:
-            log_consumer.warning("metrics failed for %s: %s", event.node, event.payload.get("error"))
-
-# Main entry into program, will likely function similarly in final driver code
-if __name__ == "__main__":
-    Supervisor().start()
-
-    while True:
-        time.sleep(60)

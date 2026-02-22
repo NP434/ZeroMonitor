@@ -4,15 +4,17 @@ import ui.theme as theme
 class Button:
     def __init__(self,
                  rect,
-                 text, 
-                 font = None, 
-                 bg_color = None, 
-                 text_color = None, 
-                 border_radius = None
+                 text="",
+                 image=None, 
+                 font=None, 
+                 bg_color=None, 
+                 text_color=None, 
+                 border_radius=None
     ):
         
         self.rect = pygame.Rect(rect)
         self.text = text
+        self.image = image
         self.font = font or theme.DEFAULT_FONT
         self.bg_color = bg_color or theme.BUTTON_BG
         self.text_color = text_color or theme.BUTTON_TEXT

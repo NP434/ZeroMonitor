@@ -40,6 +40,7 @@ class ControlUI:
         )
 
     def remove_node(self):
+        """UI Function to remove node, will be linked with a button, for now, just hardcoded"""
         self.bus.publish(
             "REMOVE_NODE",
             {
@@ -48,7 +49,7 @@ class ControlUI:
         )
 
     def stop_system(self):
-        """UI Function to remove node, will be linked with a button, for now, just hardcoded"""
+        """UI Function to shutdown system"""
         self.bus.publish(
             "STOP_SYSTEM",
             None

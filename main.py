@@ -17,7 +17,7 @@ driver.start()
 ui_control = ControlUI(bus)
 
 # Create the Pygame UI (subscribes to backend events and renders screens)
-ui_display = DisplayUI(bus)
+ui_display = DisplayUI(bus, ui_control)
 ui_display.run()
 
 # Example commands from the UI, this will be handled by UI_Controller in the future

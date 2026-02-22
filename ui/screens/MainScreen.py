@@ -11,10 +11,25 @@ class MainScreen(BaseScreen):
     """
     def __init__(self, app):
         super().__init__(app)
-    
-        # Create settings button
+
+        #Create Power Button
+        power_width = 60
+        power_height = 60
+        power_x = self.app.width - power_width - 10
+        power_y = 20
+        self.power_button = Button(
+        rect=(power_x, power_y, power_width, power_height),
+        text="P",
+        bg_color=theme.POWER_RED
+        )
+
+        # Create Settings Button
+        settings_width = 160
+        settings_height = 60
+        settings_x = power_x - settings_width - 10
+        settings_y = 20
         self.settings_button = Button(
-            rect=(app.width - 180, 20, 160, 60),
+            rect=(settings_x, settings_y, settings_width, settings_height),
             text="Settings"
         )
 
@@ -45,6 +60,9 @@ class MainScreen(BaseScreen):
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
+            if self.power_button.is_clicked(event.pos):
+                self.app.ui_control.stop_system()
+
             if self.settings_button.is_clicked(event.pos):
                 self.app.change_screen("settings")
             
@@ -93,6 +111,12 @@ class MainScreen(BaseScreen):
         )
         surface.blit(title_text, title_rect)
 
+        # Draw Settings Button
+        self.settings_button.draw(surface)
+
+        # Draw Power Button
+        self.power_button.draw(surface)
+
         # Draw selected device name
         if self.selected_device:
             name_text = theme.DEFAULT_FONT.render(f"{self.selected_device["name"]} Stats", True, theme.WHITE)
@@ -108,8 +132,7 @@ class MainScreen(BaseScreen):
             placeholder = theme.DEFAULT_FONT.render("Select a device to view stats", True, theme.WHITE)
             surface.blit(placeholder, (self.app.width // 2 - placeholder.get_width() // 200, 200))
         
-        # Draw Settings Button
-        self.settings_button.draw(surface)
+
 
         # --- Side Bar Elements ---
 
@@ -157,7 +180,7 @@ class MainScreen(BaseScreen):
 
     def _build_device_buttons(self):
         button_width = self.sidebar.width_expanded - 20
-        button_height = 40
+        button_height = 60
         x = self.sidebar.x + 10
         y = 60
 

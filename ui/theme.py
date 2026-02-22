@@ -10,6 +10,7 @@ BLUE = (0, 120, 255)
 GREEN = (46, 204, 113)
 YELLOW = (241, 196, 15)
 RED = (231, 76, 60)
+POWER_RED = (200, 50, 50)
 
 # Default Font
 DEFAULT_FONT = pygame.font.SysFont("Arial", 32)

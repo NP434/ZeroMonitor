@@ -13,10 +13,12 @@ class MainScreen(BaseScreen):
         super().__init__(app)
 
         # Load assets
-        power_icon = pygame.image.load("assets/power_button.png").convert_alpha()
-        power_icon = pygame.transform.smoothscale(power_icon, (40, 40))
-
-        #Create Power Button
+        self.load_assets()
+        power_icon = pygame.transform.smoothscale(
+            self.assets["power_button.png"], (40, 40)
+        )
+        
+        # Create Power Button
         power_width = 60
         power_height = 60
         power_x = self.app.width - power_width - 10

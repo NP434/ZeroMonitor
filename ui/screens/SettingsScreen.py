@@ -16,6 +16,7 @@ class SettingsScreen(BaseScreen):
     """
     def __init__(self, app):
         super().__init__(app)
+        self.load_assets()
 
         # Back button
         self.back_button = Button(

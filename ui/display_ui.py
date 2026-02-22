@@ -49,6 +49,10 @@ class DisplayUI:
     def change_screen(self, name):
         self.current_screen = self.screens[name]
 
+    def shutdown(self):
+        # Tell backend to stop if UI quits
+        self.bus.publish("STOP_SYSTEM", None)
+
     def run(self):
         running = True
 
@@ -66,6 +70,7 @@ class DisplayUI:
 
             pygame.display.flip()
 
+        self.shutdown()
         pygame.quit()
         sys.exit()
 

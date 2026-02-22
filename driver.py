@@ -149,7 +149,7 @@ class Driver:
         # reconcile system
         self.reload_config()
 
-    def stop_system(self):
+    def stop_system(self, payload=None):
         """Function to safely shutdown the driver"""
         logging.info("[Driver] Shutting down...")
 

@@ -18,12 +18,13 @@ ui_control = ControlUI(bus)
 
 # Create the Pygame UI (subscribes to backend events and renders screens)
 ui_display = DisplayUI(bus)
+ui_display.run()
 
 # Example commands from the UI, this will be handled by UI_Controller in the future
-ui.change_polling_rate("pihole", 30)
-ui.add_node()
+ui_control.change_polling_rate("pihole", 30)
+ui_control.add_node()
 time.sleep(20)
-ui.remove_node()
+ui_control.remove_node()
 
 # Keep alive loop
 try:

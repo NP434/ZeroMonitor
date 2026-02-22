@@ -23,8 +23,10 @@ def load_devices():
         return list(device_data.values())
     
 
-class App:
-    def __init__(self):
+class DisplayUI:
+    def __init__(self, bus):
+        self.bus = bus
+
         # Establish screen resolution
         self.width = 1024
         self.height = 600
@@ -68,4 +70,4 @@ class App:
         sys.exit()
 
 if __name__ == "__main__":
-    App().run()
+    DisplayUI().run()

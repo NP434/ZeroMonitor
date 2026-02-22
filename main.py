@@ -2,7 +2,8 @@
 import time
 from event_bus import EventBus
 from driver import Driver
-from ui_module import UI
+from ui.display_ui import DisplayUI
+from ui.control_ui import ControlUI
 
 # Create and start a single event bus that is shared between all modules
 bus = EventBus()
@@ -12,8 +13,11 @@ bus.start()
 driver = Driver(bus)
 driver.start()
 
-# Create the UI that will handle event updates and refreshes, will route button presses to "control events"
-ui = UI(bus)
+# Create the UI backend control interface (publishing control events)
+ui_control = ControlUI(bus)
+
+# Create the Pygame UI (subscribes to backend events and renders screens)
+ui_display = DisplayUI(bus)
 
 # Example commands from the UI, this will be handled by UI_Controller in the future
 ui.change_polling_rate("pihole", 30)

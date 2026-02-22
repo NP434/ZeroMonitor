@@ -47,13 +47,17 @@ class Button:
     def draw(self, surface):
         pygame.draw.rect(surface, self.bg_color, self.rect, border_radius=self.border_radius)
 
-        # Fit the text
-        max_text_width = self.rect.width - 10
-        font_to_use, fitted_text = self._fit_text(self.text, max_text_width)
+        if self.image:
+            img_rect = self.image.get_rect(center=self.rect.center)
+            surface.blit(self.image, img_rect)
+        else:
+            # Fit the text
+            max_text_width = self.rect.width - 10
+            font_to_use, fitted_text = self._fit_text(self.text, max_text_width)
 
-        text_surf = font_to_use.render(fitted_text, True, self.text_color)
-        text_rect = text_surf.get_rect(center = self.rect.center)
-        surface.blit(text_surf, text_rect)
+            text_surf = font_to_use.render(fitted_text, True, self.text_color)
+            text_rect = text_surf.get_rect(center = self.rect.center)
+            surface.blit(text_surf, text_rect)
 
     def is_clicked(self, pos):
         return self.rect.collidepoint(pos)

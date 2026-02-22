@@ -12,6 +12,10 @@ class MainScreen(BaseScreen):
     def __init__(self, app):
         super().__init__(app)
 
+        # Load assets
+        power_icon = pygame.image.load("assets/power_button.png").convert_alpha()
+        power_icon = pygame.transform.smoothscale(power_icon, (40, 40))
+
         #Create Power Button
         power_width = 60
         power_height = 60
@@ -19,7 +23,7 @@ class MainScreen(BaseScreen):
         power_y = 20
         self.power_button = Button(
         rect=(power_x, power_y, power_width, power_height),
-        text="P",
+        image=power_icon,
         bg_color=theme.POWER_RED
         )
 
@@ -57,6 +61,7 @@ class MainScreen(BaseScreen):
         self._build_device_buttons()
         self.selected_device = None
         self.stat_buttons = {}
+
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:

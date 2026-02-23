@@ -67,6 +67,9 @@ class MainScreen(BaseScreen):
             image=remove_icon,
             bg_color=theme.GRAY
         )
+        self.remove_mode = False
+        self.device_remove_buttons = {}
+        self.confirm_popup = None
 
         # Initalize device list
         self.device_buttons = []
@@ -93,6 +96,9 @@ class MainScreen(BaseScreen):
                     if scrolled_rect.collidepoint(event.pos):
                         self.selected_device = btn.device
                         self._build_stat_buttons()
+                
+                if self.remove_button.is_clicked(event.pos):
+                    self._enter_remove_mode()
 
             # Selecting stat to show graph
             if self.selected_device:
@@ -149,8 +155,15 @@ class MainScreen(BaseScreen):
         else:
             placeholder = theme.DEFAULT_FONT.render("Select a device to view stats", True, theme.WHITE)
             surface.blit(placeholder, (self.app.width // 2 - placeholder.get_width() // 200, 200))
-        
 
+        # Draw remove buttons
+        if self.remove_mode:
+            for name, rbtn in self.device_remove_buttons.items():
+                scrolled_rect = rbtn.rect.move(0, self.device_scroll)
+                original_rect = rbtn.rect
+                rbtn.rect = scrolled_rect
+                rbtn.draw(surface)
+                rbtn.rect = original_rect
 
         # --- Side Bar Elements ---
 
@@ -252,3 +265,24 @@ class MainScreen(BaseScreen):
             btn.rect.width = button_width
             btn.rect.height = button_height
             x += button_width + spacing
+
+    def _enter_remove_mode(self):
+        self.remove_mode = True
+        self._build_remove_icons()
+
+    def _build_remove_icons(self):
+        self.device_remove_buttons.clear()
+
+        icon_size = 30
+
+        for btn in self.device_buttons:
+            x = btn.rect.right - icon_size - 10
+            y = btn.rect.y + (btn.rect.height - icon_size) // 2
+
+            remove_btn = Button(
+                rect=(x, y, icon_size, icon_size),
+                text="X",
+                bg_color=theme.POWER_RED
+            )
+
+            self.device_remove_buttons[btn.device["name"]] = remove_btn

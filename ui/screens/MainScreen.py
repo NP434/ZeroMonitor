@@ -65,10 +65,13 @@ class MainScreen(BaseScreen):
             rect=(remove_x, remove_y, remove_width, remove_height),
             text="-",
             image=remove_icon,
-            bg_color=theme.GRAY
+            bg_color=theme.POWER_RED
         )
         self.remove_mode = False
         self.remove_icons = {}
+        self.confirm_popup = None
+        self.confirm_yes = None
+        self.confirm_no = None
 
         # Initalize device list
         self.device_buttons = []
@@ -98,6 +101,14 @@ class MainScreen(BaseScreen):
                 
                 if self.remove_button.is_clicked(event.pos):
                     self._enter_remove_mode()
+
+                # When user selects remove icon, open confirmation window
+                if self.remove_mode:
+                    for name, rbtn in self.remove_icons.items():
+                        scrolled_rect = rbtn.rect.move(0, self.device_scroll)
+                        if scrolled_rect.collidepoint(event.pos):
+                            self._open_remove_confirmation(name)
+                            return
 
             # Selecting stat to show graph
             if self.selected_device:
@@ -155,15 +166,6 @@ class MainScreen(BaseScreen):
             placeholder = theme.DEFAULT_FONT.render("Select a device to view stats", True, theme.WHITE)
             surface.blit(placeholder, (self.app.width // 2 - placeholder.get_width() // 200, 200))
 
-        # Draw remove buttons
-        if self.remove_mode:
-            for name, rbtn in self.remove_icons.items():
-                scrolled_rect = rbtn.rect.move(0, self.device_scroll)
-                original_rect = rbtn.rect
-                rbtn.rect = scrolled_rect
-                rbtn.draw(surface)
-                rbtn.rect = original_rect
-
         # --- Side Bar Elements ---
 
         # Draw sidebar
@@ -182,6 +184,33 @@ class MainScreen(BaseScreen):
                 btn.rect = original_rect
 
             self.remove_button.draw(surface)
+
+            # Draw remove buttons
+            if self.remove_mode:
+                for name, rbtn in self.remove_icons.items():
+                    scrolled_rect = rbtn.rect.move(0, self.device_scroll)
+                    original_rect = rbtn.rect
+                    rbtn.rect = scrolled_rect
+                    rbtn.draw(surface)
+                    rbtn.rect = original_rect
+
+        # Draw removal confirmation popup
+        if self.confirm_popup:
+            rect = self.confirm_popup["rect"]
+
+            # Background box
+            pygame.draw.rect(surface, theme.GRAY, rect, border_radius=10)
+            pygame.draw.rect(surface, theme.WHITE, rect, width=2, border_radius=10)
+
+            # Text
+            msg = theme.DEFAULT_FONT.render(
+                f"Remove {self.confirm_popup['device']}?", True, theme.WHITE
+            )
+            surface.blit(msg, (rect.centerx - msg.get_width() // 2, rect.y + 20))
+
+            # Yes/No Buttons
+            self.confirm_yes.draw(surface)
+            self.confirm_no.draw(surface)
 
     def scroll_devices(self, direction):
         scroll_amount = 20
@@ -294,3 +323,21 @@ class MainScreen(BaseScreen):
             )
 
             self.remove_icons[btn.device["name"]] = remove_btn
+
+    def _open_remove_confirmation(self, device_name):
+        popup_w = 300
+        popup_h = 150
+        popup_x = (self.app.width - popup_w) // 2
+        popup_y = (self.app.height - popup_h) // 2
+
+        self.confirm_popup = {
+            "device": device_name,
+            "rect": pygame.Rect(popup_x, popup_y, popup_w, popup_h)
+        }
+
+        #Create yes/no buttons
+        yes_rect = pygame.Rect(popup_x + 40, popup_y + 90, 80, 40)
+        no_rect = pygame.Rect(popup_x + 180, popup_y + 90, 80, 40)
+
+        self.confirm_yes = Button(yes_rect, text="Yes", bg_color=theme.GREEN)
+        self.confirm_no = Button(no_rect, text="No", bg_color=theme.RED)

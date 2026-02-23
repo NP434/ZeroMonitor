@@ -35,7 +35,7 @@ class DisplayUI:
         # Initalize ControlUI
         if ui_control is None:
             from control_ui import ControlUI
-            ui_control = ControlUI()
+            ui_control = ControlUI(self.bus)
         self.ui_control = ui_control
 
         # Event subscriptions

@@ -14,9 +14,8 @@ class MainScreen(BaseScreen):
 
         # Load assets
         self.load_assets()
-        power_icon = pygame.transform.smoothscale(
-            self.assets["power_button.png"], (40, 40)
-        )
+        power_icon = pygame.transform.smoothscale(self.assets["power_button.png"], (40, 40))
+        remove_icon = pygame.transform.smoothscale(self.assets["trash.png"], (40,40))
         
         # Create Power Button
         power_width = 60
@@ -55,6 +54,18 @@ class MainScreen(BaseScreen):
             width_expanded=250,
             width_collapsed=40,
             height=app.height
+        )
+
+        # Create Remove Device Button
+        remove_width = 50
+        remove_height = 50
+        remove_x = self.sidebar.x + (self.sidebar.width_expanded - remove_width) // 2
+        remove_y = self.app.height - remove_height - 20
+        self.remove_button = Button(
+            rect=(remove_x, remove_y, remove_width, remove_height),
+            text="-",
+            image=remove_icon,
+            bg_color=theme.GRAY
         )
 
         # Initalize device list
@@ -157,6 +168,8 @@ class MainScreen(BaseScreen):
                 btn.rect = scrolled_rect
                 btn.draw(surface)
                 btn.rect = original_rect
+
+            self.remove_button.draw(surface)
 
     def scroll_devices(self, direction):
         scroll_amount = 20

@@ -68,8 +68,7 @@ class MainScreen(BaseScreen):
             bg_color=theme.GRAY
         )
         self.remove_mode = False
-        self.device_remove_buttons = {}
-        self.confirm_popup = None
+        self.remove_icons = {}
 
         # Initalize device list
         self.device_buttons = []
@@ -158,7 +157,7 @@ class MainScreen(BaseScreen):
 
         # Draw remove buttons
         if self.remove_mode:
-            for name, rbtn in self.device_remove_buttons.items():
+            for name, rbtn in self.remove_icons.items():
                 scrolled_rect = rbtn.rect.move(0, self.device_scroll)
                 original_rect = rbtn.rect
                 rbtn.rect = scrolled_rect
@@ -212,17 +211,21 @@ class MainScreen(BaseScreen):
             self.device_scroll = min_scroll
 
     def _build_device_buttons(self):
+        self.device_buttons = []
+
         button_width = self.sidebar.width_expanded - 20
         button_height = 60
         x = self.sidebar.x + 10
         y = 60
+
+        remove_icon_space = 50 if self.remove_mode else 0
 
         for device in self.app.devices:
             status = device.get("status", "Offline")
             color = theme.STATUS_COLORS.get(status, (100, 100, 100))
 
             btn = Button(
-                rect=(x, y, button_width, button_height),
+                rect=(x + remove_icon_space, y, button_width - remove_icon_space, button_height),
                 text=device["name"],
                 bg_color=color
             )
@@ -268,15 +271,20 @@ class MainScreen(BaseScreen):
 
     def _enter_remove_mode(self):
         self.remove_mode = True
+        self._build_device_buttons()
         self._build_remove_icons()
 
-    def _build_remove_icons(self):
-        self.device_remove_buttons.clear()
+    def _exit_remove_mode(self):
+        self.remove_mode = False
+        self.remove_icons.clear()
+        self._build_device_buttons()
 
-        icon_size = 30
+    def _build_remove_icons(self):
+        icon_size = 40
+        padding = 10
 
         for btn in self.device_buttons:
-            x = btn.rect.right - icon_size - 10
+            x = self.sidebar.x + padding
             y = btn.rect.y + (btn.rect.height - icon_size) // 2
 
             remove_btn = Button(
@@ -285,4 +293,4 @@ class MainScreen(BaseScreen):
                 bg_color=theme.POWER_RED
             )
 
-            self.device_remove_buttons[btn.device["name"]] = remove_btn
+            self.remove_icons[btn.device["name"]] = remove_btn

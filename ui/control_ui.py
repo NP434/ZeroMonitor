@@ -44,7 +44,7 @@ class ControlUI:
         self.bus.publish(
             "REMOVE_NODE",
             {
-                "name": device_name
+                "node": device_name
             }
         )
 

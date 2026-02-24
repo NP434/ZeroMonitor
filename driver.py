@@ -229,8 +229,16 @@ class Driver:
         self.polling_agent.reconcile(nodes)
 
         # Publish device list to UI
-        device_list = [n.todict() for n in nodes]
+        device_list = []
+        for n in nodes:
+            device_list.append({
+                "name": n.name,
+                "hostname": n.provider.conn.host,
+                "operating_system": n.provider.__class__.__name__.replace("MetricsProvider", ""),
+                "polling_frequency": n.interval
+            })
         self.event_bus.publish("DEVICE_LIST_UPDATED", device_list)
+
 
 # Load and initialize targets from device_list.json
 def load_targets() -> list:

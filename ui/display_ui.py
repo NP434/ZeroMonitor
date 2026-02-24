@@ -40,6 +40,7 @@ class DisplayUI:
 
         # Event subscriptions
         self.bus.subscribe("STOP_SYSTEM", self._handle_stop_system)
+        self.bus.subscribe("DEVICE_LIST_UPDATED", self._handle_device_list_update)
 
         # Establish screen resolution
         self.width = 1024
@@ -72,6 +73,12 @@ class DisplayUI:
     def _handle_stop_system(self, payload=None):
         """Backend-initiated shutdown -> Shutdown UI Loop"""
         self._running = False
+
+    def _handle_device_list_update(self, devices):
+        print("inside _handle_device_list_update")
+        self.devices = devices
+        if isinstance(self.current_screen, MainScreen):
+            self.current_screen._build_device_buttons()
 
     def run(self):
         self._running = True

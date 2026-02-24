@@ -1,7 +1,6 @@
 import logging
-import time
 import uuid
-import os
+
 from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 from json import load
@@ -149,7 +148,7 @@ class Driver:
         # reconcile system
         self.reload_config()
 
-    def stop_system(self):
+    def stop_system(self, payload=None):
         """Function to safely shutdown the driver"""
         logging.info("[Driver] Shutting down...")
 
@@ -227,6 +226,18 @@ class Driver:
 
         nodes = load_targets()
         self.polling_agent.reconcile(nodes)
+
+        # Publish device list to UI
+        device_list = []
+        for n in nodes:
+            device_list.append({
+                "name": n.name,
+                "hostname": n.provider.conn.host,
+                "operating_system": n.provider.__class__.__name__.replace("MetricsProvider", ""),
+                "polling_frequency": n.interval
+            })
+        self.event_bus.publish("DEVICE_LIST_UPDATED", device_list)
+
 
 # Load and initialize targets from device_list.json
 def load_targets() -> list:

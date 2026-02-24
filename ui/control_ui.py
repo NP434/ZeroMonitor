@@ -2,7 +2,7 @@
 # The functions in this module are samples, merely meant to understand the flow between modules
 import logging
 
-class UI:
+class ControlUI:
     """Framework for the UI class that will drive the UI and publish events to the driver based on button presses"""
     def __init__(self, event_bus):
         self.bus = event_bus
@@ -39,16 +39,17 @@ class UI:
             }
         )
 
-    def remove_node(self):
+    def remove_node(self, device_name):
+        """UI Function to remove node, will be linked with a button, for now, just hardcoded"""
         self.bus.publish(
             "REMOVE_NODE",
             {
-                "node": "nas"
+                "node": device_name
             }
         )
 
     def stop_system(self):
-        """UI Function to remove node, will be linked with a button, for now, just hardcoded"""
+        """UI Function to shutdown system"""
         self.bus.publish(
             "STOP_SYSTEM",
             None

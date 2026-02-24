@@ -8,7 +8,6 @@ between them.
 """
 import pygame
 import json
-import os
 import sys
 from ui.screens.MainScreen import MainScreen
 from ui.screens.SettingsScreen import SettingsScreen
@@ -23,8 +22,25 @@ def load_devices():
         return list(device_data.values())
     
 
-class App:
-    def __init__(self):
+class DisplayUI:
+    def __init__(self, bus=None, ui_control=None):
+        # Initialize an EventBus
+        if bus is None:
+            from event_bus import EventBus
+            bus = EventBus()
+            bus.start()
+        self.bus = bus
+
+        # Initalize ControlUI
+        if ui_control is None:
+            from control_ui import ControlUI
+            ui_control = ControlUI(self.bus)
+        self.ui_control = ui_control
+
+        # Event subscriptions
+        self.bus.subscribe("STOP_SYSTEM", self._handle_stop_system)
+        self.bus.subscribe("DEVICE_LIST_UPDATED", self._handle_device_list_update)
+
         # Establish screen resolution
         self.width = 1024
         self.height = 600
@@ -43,17 +59,33 @@ class App:
 
         # Starting on the main screen
         self.current_screen = self.screens["main"]
+        self._running = False
+
 
     def change_screen(self, name):
         self.current_screen = self.screens[name]
 
-    def run(self):
-        running = True
+    def shutdown(self):
+        """UI-initiated shutdown -> publish STOP_SYSTEM"""
+        self.bus.publish("STOP_SYSTEM", None)
 
-        while running:
+    def _handle_stop_system(self, payload=None):
+        """Backend-initiated shutdown -> Shutdown UI Loop"""
+        self._running = False
+
+    def _handle_device_list_update(self, devices):
+        print("inside _handle_device_list_update")
+        self.devices = devices
+        if isinstance(self.current_screen, MainScreen):
+            self.current_screen._build_device_buttons()
+
+    def run(self):
+        self._running = True
+
+        while self._running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    running = False
+                    self.shutdown()
 
                 # Send events to the active screen to be handled
                 self.current_screen.handle_event(event)
@@ -68,4 +100,4 @@ class App:
         sys.exit()
 
 if __name__ == "__main__":
-    App().run()
+    DisplayUI().run()

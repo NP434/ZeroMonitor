@@ -16,6 +16,7 @@ class SettingsScreen(BaseScreen):
     """
     def __init__(self, app):
         super().__init__(app)
+        self.load_assets()
 
         # Back button
         self.back_button = Button(
@@ -42,12 +43,17 @@ class SettingsScreen(BaseScreen):
     def handle_event(self, event):
         self.brightness_slider.handle_event(event)
         
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if self.back_button.is_clicked(event.pos):
-                self.app.change_screen("main")
+        if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
+            if event.type == pygame.FINGERDOWN:
+                pos = (
+                    int(event.x * self.app.width),
+                    int(event.y * self.app.height)
+                )
+            else:
+                pos = event.pos
 
-        self.brightness_slider.handle_event(event)
-            
+            if self.back_button.is_clicked(pos):
+                self.app.change_screen("main")
 
     def draw(self, surface):
         surface.fill(theme.GRAY)

@@ -8,7 +8,7 @@ class SidebarPanel:
     """
     Docstring for SidebarPanel
     """
-    def __init__(self, x, y, width_expanded, width_collapsed, height, expanded=False, toggle_button=None):
+    def __init__(self, x, y, width_expanded, width_collapsed, height, expanded=True, toggle_button=None):
         self.x = x
         self.y = y
         self.width_collapsed = width_collapsed
@@ -16,7 +16,7 @@ class SidebarPanel:
         self.current_width = width_collapsed
         self.height = height
 
-        self.expanded = True
+        self.expanded = expanded
         self.animation_speed = 20
 
         # Colors 

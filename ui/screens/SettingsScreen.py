@@ -43,7 +43,7 @@ class SettingsScreen(BaseScreen):
     def handle_event(self, event):
         self.brightness_slider.handle_event(event)
         
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == pygame.FINGERDOWN:
             if self.back_button.is_clicked(event.pos):
                 self.app.change_screen("main")
 

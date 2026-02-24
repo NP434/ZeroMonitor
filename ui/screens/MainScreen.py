@@ -82,7 +82,7 @@ class MainScreen(BaseScreen):
 
 
     def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == pygame.FINGERDOWN:
             if self.power_button.is_clicked(event.pos):
                 self.app.ui_control.stop_system()
 

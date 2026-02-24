@@ -95,37 +95,37 @@ class MainScreen(BaseScreen):
                 # Mouse event provides pixel coordinates
                 pos = event.pos
 
-            if self.power_button.is_clicked(event.pos):
+            if self.power_button.is_clicked(pos):
                 self.app.ui_control.stop_system()
 
-            if self.settings_button.is_clicked(event.pos):
+            if self.settings_button.is_clicked(pos):
                 self.app.change_screen("settings")
             
-            if self.clock_button.is_clicked(event.pos):
+            if self.clock_button.is_clicked(pos):
                 self.use_24hr = not self.use_24hr
 
             if self.sidebar.current_width > self.sidebar.width_collapsed + 20:
                 for btn in self.device_buttons:
                     scrolled_rect = btn.rect.move(0, self.device_scroll)
-                    if scrolled_rect.collidepoint(event.pos):
+                    if scrolled_rect.collidepoint(pos):
                         self.selected_device = btn.device
                         self._build_stat_buttons()
                 
-                if self.remove_button.is_clicked(event.pos):
+                if self.remove_button.is_clicked(pos):
                     self._enter_remove_mode()
 
                 # When user selects remove icon, open confirmation window
                 if self.remove_mode:
                     for name, rbtn in self.remove_icons.items():
                         scrolled_rect = rbtn.rect.move(0, self.device_scroll)
-                        if scrolled_rect.collidepoint(event.pos):
+                        if scrolled_rect.collidepoint(pos):
                             self._open_remove_confirmation(name)
                             return
 
             # Selecting stat to show graph
             if self.selected_device:
                 for key, btn in self.stat_buttons.items():
-                    if btn.is_clicked(event.pos):
+                    if btn.is_clicked(pos):
                         print(f"Clicked stat: {key}")
 
         elif event.type == pygame.MOUSEWHEEL:

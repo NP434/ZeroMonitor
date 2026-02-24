@@ -94,15 +94,34 @@ class MainScreen(BaseScreen):
                 # Mouse event provides pixel coordinates
                 pos = event.pos
 
+            # --- Confirmation popup handling ---
+            if self.confirm_popup:
+                # Yes, remove device
+                if self.confirm_yes.is_clicked(pos):
+                    self._confirm_remove(self.confirm_popup["device"])
+                    return
+
+                # No, cancel removal
+                if self.confirm_no.is_clicked(pos):
+                    self._cancel_remove()
+                    return
+                
+                # Block other inputs while waiting for button press
+                return
+
+            # Power Button clicked
             if self.power_button.is_clicked(pos):
                 self.app.ui_control.stop_system()
 
+            # Settings button clicked
             if self.settings_button.is_clicked(pos):
                 self.app.change_screen("settings")
             
+            # Clock button clicked
             if self.clock_button.is_clicked(pos):
                 self.use_24hr = not self.use_24hr
 
+            # Sidebar expanded
             if self.sidebar.current_width > self.sidebar.width_collapsed + 20:
                 for btn in self.device_buttons:
                     scrolled_rect = btn.rect.move(0, self.device_scroll)
@@ -352,3 +371,28 @@ class MainScreen(BaseScreen):
 
         self.confirm_yes = Button(yes_rect, text="Yes", bg_color=theme.GREEN)
         self.confirm_no = Button(no_rect, text="No", bg_color=theme.RED)
+
+    def _confirm_remove(self, device_name):
+        # Remove from backend by calling ui_control method
+        self.app.ui_control.remove_node(device_name)
+
+        # Close popup
+        self.confirm_popup = None
+        self.confirm_yes = None
+        self.confirm_no = None
+
+        # Exit remove mode
+        self.remove_mode = False
+        self.remove_icons.clear()
+
+        # Rebuild UI from REAL device list
+        self._build_device_buttons()
+
+    def _cancel_remove(self):
+        self.confirm_popup = None
+        self.confirm_yes = None
+        self.confirm_no = None  
+
+        self.remove_mode = False
+        self.remove_icons.clear()
+        self._build_device_buttons()

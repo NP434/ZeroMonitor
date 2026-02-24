@@ -12,7 +12,7 @@ class ConfirmationPopup:
 
         # Popup geometry
         w = 300
-        y = 150
+        h = 150
         x = (self.app.width - w) // 2
         y = (self.app.height - h) // 2
         self.rect = pygame.Rect(x, y, w, h)
@@ -60,14 +60,14 @@ class ConfirmationPopup:
         if not self.open:
             return
 
-            # Background box
-            pygame.draw.rect(surface, theme.GRAY, self.rect, border_radius=10)
-            pygame.draw.rect(surface, theme.WHITE, self.rect, width=2, border_radius=10)
+        # Background box
+        pygame.draw.rect(surface, theme.GRAY, self.rect, border_radius=10)
+        pygame.draw.rect(surface, theme.WHITE, self.rect, width=2, border_radius=10)
 
-            # Text
-            msg = theme.DEFAULT_FONT.render(self.message, True, theme.WHITE)
-            surface.blit(msg, (self.rect.centerx - msg.get_width() // 2, self.rect.y + 20))
+        # Text
+        msg = theme.DEFAULT_FONT.render(self.message, True, theme.WHITE)
+        surface.blit(msg, (self.rect.centerx - msg.get_width() // 2, self.rect.y + 20))
 
-            # Yes/No Buttons
-            self.confirm_yes.draw(surface)
-            self.confirm_no.draw(surface)
+        # Yes/No Buttons
+        self.confirm_yes.draw(surface)
+        self.confirm_no.draw(surface)

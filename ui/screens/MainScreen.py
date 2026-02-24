@@ -3,6 +3,7 @@ import pygame
 from ui.screens.BaseScreen import BaseScreen
 from ui.widgets.Button import Button
 from ui.widgets.SidebarPanel import SidebarPanel
+from ui.widgets.ConfirmationPopup import ConfirmationPopup
 import ui.theme as theme
 
 class MainScreen(BaseScreen):
@@ -69,9 +70,6 @@ class MainScreen(BaseScreen):
         )
         self.remove_mode = False
         self.remove_icons = {}
-        self.confirm_popup = None
-        self.confirm_yes = None
-        self.confirm_no = None
 
         # Initalize device list
         self.device_buttons = []
@@ -79,6 +77,10 @@ class MainScreen(BaseScreen):
         self._build_device_buttons()
         self.selected_device = None
         self.stat_buttons = {}
+
+        # Other initializations/state variables
+        self.popup = None
+
 
     def handle_event(self, event):
         if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
@@ -93,19 +95,11 @@ class MainScreen(BaseScreen):
                 # Mouse event provides pixel coordinates
                 pos = event.pos
 
-            # --- Confirmation popup handling ---
-            if self.confirm_popup:
-                # Yes, remove device
-                if self.confirm_yes.is_clicked(pos):
-                    self._confirm_remove(self.confirm_popup["device"])
-                    return
-
-                # No, cancel removal
-                if self.confirm_no.is_clicked(pos):
-                    self._cancel_remove()
-                    return
-                
-                # Block other inputs while waiting for button press
+            # Handle popups
+            if self.popup:
+                self.popup.handle_event(event)
+                if not self.popup.open:
+                    self.popup = None
                 return
 
             # Power Button clicked
@@ -133,10 +127,15 @@ class MainScreen(BaseScreen):
 
                 # When user selects remove icon, open confirmation window
                 if self.remove_mode:
-                    for name, rbtn in self.remove_icons.items():
+                    for device_name, rbtn in self.remove_icons.items():
                         scrolled_rect = rbtn.rect.move(0, self.device_scroll)
                         if scrolled_rect.collidepoint(pos):
-                            self._open_remove_confirmation(name)
+                            self.popup = ConfirmationPopup(
+                                app=self.app,
+                                message=f"Remove {device_name}?",
+                                on_confirm=lambda name = device_name: self._confirm_remove(name),
+                                on_cancel=self._exit_remove_mode
+                            )
                             return
 
             # Selecting stat to show graph
@@ -223,23 +222,9 @@ class MainScreen(BaseScreen):
                     rbtn.draw(surface)
                     rbtn.rect = original_rect
 
-        # Draw removal confirmation popup
-        if self.confirm_popup:
-            rect = self.confirm_popup["rect"]
-
-            # Background box
-            pygame.draw.rect(surface, theme.GRAY, rect, border_radius=10)
-            pygame.draw.rect(surface, theme.WHITE, rect, width=2, border_radius=10)
-
-            # Text
-            msg = theme.DEFAULT_FONT.render(
-                f"Remove {self.confirm_popup['device']}?", True, theme.WHITE
-            )
-            surface.blit(msg, (rect.centerx - msg.get_width() // 2, rect.y + 20))
-
-            # Yes/No Buttons
-            self.confirm_yes.draw(surface)
-            self.confirm_no.draw(surface)
+        # Draw popup
+        if self.popup:
+            self.popup.draw(surface)
 
     def scroll_devices(self, direction):
         scroll_amount = 20
@@ -337,13 +322,19 @@ class MainScreen(BaseScreen):
         self.remove_icons.clear()
         self._build_device_buttons()
 
+    def _confirm_remove(self, device_name):
+        # Remove from backend by calling ui_control method
+        self.app.ui_control.remove_node(device_name)
+        self._exit_remove_mode()
+
     def _build_remove_icons(self):
         icon_size = 40
         padding = 10
 
         for btn in self.device_buttons:
             x = self.sidebar.x + padding
-            y = btn.rect.y + (btn.rect.height - icon_size) // 2
+            scrolled_y = btn.rect.y + self.device_scroll
+            y = scrolled_y + (btn.rect.height - icon_size) // 2
 
             remove_btn = Button(
                 rect=(x, y, icon_size, icon_size),
@@ -352,46 +343,3 @@ class MainScreen(BaseScreen):
             )
 
             self.remove_icons[btn.device["name"]] = remove_btn
-
-    def _open_remove_confirmation(self, device_name):
-        popup_w = 300
-        popup_h = 150
-        popup_x = (self.app.width - popup_w) // 2
-        popup_y = (self.app.height - popup_h) // 2
-
-        self.confirm_popup = {
-            "device": device_name,
-            "rect": pygame.Rect(popup_x, popup_y, popup_w, popup_h)
-        }
-
-        #Create yes/no buttons
-        yes_rect = pygame.Rect(popup_x + 40, popup_y + 90, 80, 40)
-        no_rect = pygame.Rect(popup_x + 180, popup_y + 90, 80, 40)
-
-        self.confirm_yes = Button(yes_rect, text="Yes", bg_color=theme.GREEN)
-        self.confirm_no = Button(no_rect, text="No", bg_color=theme.RED)
-
-    def _confirm_remove(self, device_name):
-        # Remove from backend by calling ui_control method
-        self.app.ui_control.remove_node(device_name)
-
-        # Close popup
-        self.confirm_popup = None
-        self.confirm_yes = None
-        self.confirm_no = None
-
-        # Exit remove mode
-        self.remove_mode = False
-        self.remove_icons.clear()
-
-        # Rebuild UI from REAL device list
-        self._build_device_buttons()
-
-    def _cancel_remove(self):
-        self.confirm_popup = None
-        self.confirm_yes = None
-        self.confirm_no = None  
-
-        self.remove_mode = False
-        self.remove_icons.clear()
-        self._build_device_buttons()

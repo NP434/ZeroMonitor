@@ -80,7 +80,6 @@ class MainScreen(BaseScreen):
         self.selected_device = None
         self.stat_buttons = {}
 
-
     def handle_event(self, event):
         if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
 

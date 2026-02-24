@@ -8,7 +8,6 @@ between them.
 """
 import pygame
 import json
-import os
 import sys
 from ui.screens.MainScreen import MainScreen
 from ui.screens.SettingsScreen import SettingsScreen

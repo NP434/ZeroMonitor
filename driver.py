@@ -228,6 +228,10 @@ class Driver:
         nodes = load_targets()
         self.polling_agent.reconcile(nodes)
 
+        # Publish device list to UI
+        device_list = [n.todict() for n in nodes]
+        self.event_bus.publish("DEVICE_LIST_UPDATED", device_list)
+
 # Load and initialize targets from device_list.json
 def load_targets() -> list:
     """Function to load and initialize targets from device_list.json"""

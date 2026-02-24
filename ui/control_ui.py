@@ -39,12 +39,12 @@ class ControlUI:
             }
         )
 
-    def remove_node(self):
+    def remove_node(self, device_name):
         """UI Function to remove node, will be linked with a button, for now, just hardcoded"""
         self.bus.publish(
             "REMOVE_NODE",
             {
-                "node": "nas"
+                "name": device_name
             }
         )
 

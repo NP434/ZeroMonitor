@@ -77,6 +77,7 @@ class DisplayUI:
         print("inside _handle_device_list_update")
         self.devices = devices
         if isinstance(self.current_screen, MainScreen):
+            self.current_screen.selected_device = None
             self.current_screen._build_device_buttons()
 
     def run(self):

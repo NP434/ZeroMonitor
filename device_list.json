@@ -6,18 +6,11 @@
         "operating_system": "linux",
         "polling_frequency": "4"
     },
-    "target_two": {
-        "name": "AlecsPC",
-        "hostname": "192.168.0.67",
-        "user": "cliff",
-        "operating_system": "windows",
-        "polling_frequency": "3"
-    },
-    "target_three": {
-        "name": "Pihole",
-        "hostname": "192.168.0.93",
-        "user": "admin",
-        "operating_system": "linux",
+    "target_four": {
+        "name": "PiDummy",
+        "hostname": "192.168.0.00",
+        "user": "bleh",
+        "operating_system": "macOS",
         "polling_frequency": "5"
     },
     "414b2157-540b-4d31-a2e1-19eb62e2e5b1": {

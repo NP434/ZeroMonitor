@@ -54,19 +54,30 @@ class Slider:
                 if self._handle_rect().collidepoint(pos):
                     self.dragging = True
 
-            elif event.type == pygame.FINGERUP:
-                self.dragging = False
+        # Up
+        elif event.type in (pygame.MOUSEBUTTONUP, pygame.FINGERUP):
+            self.dragging = False
 
-            elif event.type == pygame.FINGERMOTION and self.dragging:
-                x = event.pos[0]
-                x = max(self.rect.left, min(pos[0], self.rect.right))
-                ratio = (x - self.rect.left) / self.rect.width
-                new_value = self.min_value + ratio * (self.max_value - self.min_value)
+        # Motion
+        elif event.type in (pygame.MOUSEMOTION, pygame.FINGERMOTION) and self.dragging:
+            if event.type == pygame.FINGERDOWN:
+            # Finger coordinates are normalized (0.0 - 1.0)
+                pos = (
+                    int(event.x * self.app.width),
+                    int(event.y * self.app.height)
+                )
+            else:
+            # Mouse event provides pixel coordinates
+                pos = event.pos
 
-                if int(new_value) != int(self.value):
-                    self.value = new_value
-                    if self.on_change:
-                        self.on_change(self.value)
+            x = max(self.rect.left, min(pos[0], self.rect.right))
+            ratio = (x - self.rect.left) / self.rect.width
+            new_value = self.min_value + ratio * (self.max_value - self.min_value)
+
+            if int(new_value) != int(self.value):
+                self.value = new_value
+                if self.on_change:
+                    self.on_change(self.value)
 
     def draw(self, surface):
         # Draw Label

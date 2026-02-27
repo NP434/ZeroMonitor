@@ -8,7 +8,8 @@ class SidebarPanel:
     """
     Docstring for SidebarPanel
     """
-    def __init__(self, x, y, width_expanded, width_collapsed, height, expanded=True, toggle_button=None):
+    def __init__(self, app,  x, y, width_expanded, width_collapsed, height, expanded=True, toggle_button=None):
+        self.app = app
         self.x = x
         self.y = y
         self.width_collapsed = width_collapsed

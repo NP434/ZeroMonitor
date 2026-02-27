@@ -50,6 +50,7 @@ class MainScreen(BaseScreen):
 
         # Create sidebar panel
         self.sidebar = SidebarPanel(
+            self.app,
             x=0,
             y=0,
             width_expanded=250,

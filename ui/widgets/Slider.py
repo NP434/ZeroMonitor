@@ -9,6 +9,7 @@ class Slider:
 
     def __init__(
             self,
+            app,
             rect,
             min_value=0,
             max_value=100,
@@ -19,6 +20,7 @@ class Slider:
             text_color=None,
             on_change=None
         ):
+        self.app = app
         self.rect = pygame.Rect(rect)
         self.min_value = min_value
         self.max_value = max_value

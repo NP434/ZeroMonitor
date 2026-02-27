@@ -36,23 +36,35 @@ class Slider:
         self.dragging = False
 
     def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if self._handle_rect().collidepoint(event.pos):
-                self.dragging = True
+        if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
+            # Determine position based on event type
+            if event.type == pygame.FINGERDOWN:
+                # Finger coordinates are normalized (0.0 - 1.0)
+                pos = (
+                    int(event.x * self.app.width),
+                    int(event.y * self.app.height)
+                )
+            else:
+                # Mouse event provides pixel coordinates
+                pos = event.pos
 
-        elif event.type == pygame.MOUSEBUTTONUP:
-            self.dragging = False
+            if event.type == pygame.FINGERDOWN:
+                if self._handle_rect().collidepoint(pos):
+                    self.dragging = True
 
-        elif event.type == pygame.MOUSEMOTION and self.dragging:
-            x = event.pos[0]
-            x = max(self.rect.left, min(event.pos[0], self.rect.right))
-            ratio = (x - self.rect.left) / self.rect.width
-            new_value = self.min_value + ratio * (self.max_value - self.min_value)
+            elif event.type == pygame.FINGERUP:
+                self.dragging = False
 
-            if int(new_value) != int(self.value):
-                self.value = new_value
-                if self.on_change:
-                    self.on_change(self.value)
+            elif event.type == pygame.FINGERMOTION and self.dragging:
+                x = event.pos[0]
+                x = max(self.rect.left, min(pos[0], self.rect.right))
+                ratio = (x - self.rect.left) / self.rect.width
+                new_value = self.min_value + ratio * (self.max_value - self.min_value)
+
+                if int(new_value) != int(self.value):
+                    self.value = new_value
+                    if self.on_change:
+                        self.on_change(self.value)
 
     def draw(self, surface):
         # Draw Label

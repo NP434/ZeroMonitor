@@ -81,10 +81,6 @@ class SidebarPanel:
 
     def handle_event(self, event):
         if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
-<<<<<<< HEAD
-=======
-
->>>>>>> f385042 (sidebar event fix)
             # Determine position based on event type
             if event.type == pygame.FINGERDOWN:
                 # Finger coordinates are normalized (0.0 - 1.0)
@@ -96,13 +92,6 @@ class SidebarPanel:
                 # Mouse event provides pixel coordinates
                 pos = event.pos
 
-<<<<<<< HEAD
-        if event.type == pygame.FINGERDOWN:
-            if self.toggle_button.is_clicked(pos):
-                self.toggle()
-=======
             if event.type == pygame.FINGERDOWN:
                 if self.toggle_button.is_clicked(pos):
                     self.toggle()
->>>>>>> f385042 (sidebar event fix)
-

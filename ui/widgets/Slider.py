@@ -60,7 +60,7 @@ class Slider:
 
         # Motion
         elif event.type in (pygame.MOUSEMOTION, pygame.FINGERMOTION) and self.dragging:
-            if event.type == pygame.FINGERDOWN:
+            if event.type == pygame.FINGERMOTION:
             # Finger coordinates are normalized (0.0 - 1.0)
                 pos = (
                     int(event.x * self.app.width),

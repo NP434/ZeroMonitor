@@ -1,3 +1,8 @@
+
+# Fake Event Bus and Metric Event classes for testing purposes. In a real implementation,
+# these would be provided by the actual event system in use and would likely have more complex structures
+# and behaviors.
+'''
 import time
 
 class FakeEventBus:
@@ -23,8 +28,12 @@ class FakeMetricEvent:
         self.payload = payload
         self.timestamp = time.time()
         self.success = True
+'''
 
+
+# Data Interpreter Module
 class DataInterpreter:
+    # Default Thresholds for metrics (can be overridden per device)
     DEFAULT_THRESHOLDS = {
         "cpu_load_1m": 0.80,
         "mem_used_percent": 85.0,
@@ -206,6 +215,8 @@ class DataInterpreter:
             return "severe"
 
 
+# Example usage with fake events
+'''
 event = FakeEventBus()
 interpreter = DataInterpreter(event)
 
@@ -231,3 +242,4 @@ event.publish("METRIC_EVENT", FakeMetricEvent(
         "disk_used_percent": 60,
     }
 ))
+'''

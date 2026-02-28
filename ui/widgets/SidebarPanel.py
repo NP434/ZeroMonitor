@@ -93,6 +93,5 @@ class SidebarPanel:
                 # Mouse event provides pixel coordinates
                 pos = event.pos
 
-            if event.type == pygame.FINGERDOWN:
-                if self.toggle_button.is_clicked(pos):
-                    self.toggle()
+            if self.toggle_button.is_clicked(pos):
+                self.toggle()

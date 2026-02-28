@@ -38,7 +38,10 @@ class Slider:
         self.dragging = False
 
     def handle_event(self, event):
+
+        # --- DOWN EVENTS ---
         if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN):
+
             # Determine position based on event type
             if event.type == pygame.FINGERDOWN:
                 # Finger coordinates are normalized (0.0 - 1.0)
@@ -50,16 +53,17 @@ class Slider:
                 # Mouse event provides pixel coordinates
                 pos = event.pos
 
-            if event.type == pygame.FINGERDOWN:
-                if self._handle_rect().collidepoint(pos):
-                    self.dragging = True
+            if self._handle_rect().collidepoint(pos):
+                self.dragging = True
 
-        # Up
+        # --- UP EVENTS ---
         elif event.type in (pygame.MOUSEBUTTONUP, pygame.FINGERUP):
             self.dragging = False
 
-        # Motion
+        # --- MOTION EVENTS
         elif event.type in (pygame.MOUSEMOTION, pygame.FINGERMOTION) and self.dragging:
+
+            # Determine position based on event type
             if event.type == pygame.FINGERMOTION:
             # Finger coordinates are normalized (0.0 - 1.0)
                 pos = (

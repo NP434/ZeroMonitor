@@ -78,15 +78,22 @@ class DisplayUI:
         node = payload.get("node")
         success = payload.get("success")
 
-        print(f"ACK_REMOVE NODE received for {node}, success={success}")
+        print(f"ACK_REMOVE_NODE received for {node}, success={success}")
+        
         if isinstance(self.current_screen, MainScreen):
+            sel = self.current_screen.selected_device
+            if isinstance(sel, dict):
+                if sel.get("name") == node:
+                    self.current_screen.selected_device = None
+            elif sel == node:
+                self.current_screen.selected_device = None
+
             self.current_screen._exit_remove_mode()
 
     def _handle_device_list_update(self, devices):
         print("inside _handle_device_list_update")
         self.devices = list(devices.values())
         if isinstance(self.current_screen, MainScreen):
-            self.current_screen.selected_device = None
             self.current_screen._build_device_buttons()
 
     def run(self):

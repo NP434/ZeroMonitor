@@ -6,13 +6,6 @@
         "operating_system": "linux",
         "polling_frequency": "4"
     },
-    "target_two": {
-        "name": "AlecsPC",
-        "hostname": "192.168.0.67",
-        "user": "cliff",
-        "operating_system": "windows",
-        "polling_frequency": "3"
-    },
     "target_three": {
         "name": "Pihole",
         "hostname": "192.168.0.93",

@@ -75,7 +75,7 @@ class DisplayUI:
 
     def _handle_device_list_update(self, devices):
         print("inside _handle_device_list_update")
-        self.devices = devices
+        self.devices = list(devices.values())
         if isinstance(self.current_screen, MainScreen):
             self.current_screen.selected_device = None
             self.current_screen._build_device_buttons()
@@ -91,7 +91,7 @@ class DisplayUI:
                 # Send events to the active screen to be handled
                 self.current_screen.handle_event(event)
             
-            # Update and draw the active screen
+            # Update and draw the active screen  
             self.current_screen.update()
             self.current_screen.draw(self.screen)
 

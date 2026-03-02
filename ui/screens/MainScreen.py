@@ -315,6 +315,7 @@ class MainScreen(BaseScreen):
 
     def _enter_remove_mode(self):
         self.remove_mode = True
+        self.remove_icons.clear()
         self._build_device_buttons()
         self._build_remove_icons()
 
@@ -326,7 +327,6 @@ class MainScreen(BaseScreen):
     def _confirm_remove(self, device_name):
         # Remove from backend by calling ui_control method
         self.app.ui_control.remove_node(device_name)
-        self._exit_remove_mode()
 
     def _build_remove_icons(self):
         icon_size = 40

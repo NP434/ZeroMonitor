@@ -39,6 +39,7 @@ class DisplayUI:
 
         # Event subscriptions
         self.bus.subscribe("STOP_SYSTEM", self._handle_stop_system)
+        self.bus.subscribe("ACK_REMOVE_NODE", self._handle_ack_remove)
         self.bus.subscribe("DEVICE_LIST_UPDATED", self._handle_device_list_update)
 
         # Establish screen resolution
@@ -73,11 +74,26 @@ class DisplayUI:
         """Backend-initiated shutdown -> Shutdown UI Loop"""
         self._running = False
 
+    def _handle_ack_remove(self, payload):
+        node = payload.get("node")
+        success = payload.get("success")
+
+        print(f"ACK_REMOVE_NODE received for {node}, success={success}")
+        
+        if isinstance(self.current_screen, MainScreen):
+            sel = self.current_screen.selected_device
+            if isinstance(sel, dict):
+                if sel.get("name") == node:
+                    self.current_screen.selected_device = None
+            elif sel == node:
+                self.current_screen.selected_device = None
+
+            self.current_screen._exit_remove_mode()
+
     def _handle_device_list_update(self, devices):
         print("inside _handle_device_list_update")
-        self.devices = devices
+        self.devices = list(devices.values())
         if isinstance(self.current_screen, MainScreen):
-            self.current_screen.selected_device = None
             self.current_screen._build_device_buttons()
 
     def run(self):
@@ -91,7 +107,7 @@ class DisplayUI:
                 # Send events to the active screen to be handled
                 self.current_screen.handle_event(event)
             
-            # Update and draw the active screen
+            # Update and draw the active screen  
             self.current_screen.update()
             self.current_screen.draw(self.screen)
 

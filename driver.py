@@ -103,6 +103,7 @@ class Driver:
     def remove_node(self, node_name: str):
         """System-level node removal"""
 
+        success = False
         logging.info("[Driver] Removing node: %s", node_name)
 
         # Stop the running worker
@@ -133,17 +134,26 @@ class Driver:
                     "[Driver] Node '%s' removed from configuration",
                     node_name
                 )
+                success = True
             else:
                 logging.warning(
                     "[Driver] Node '%s' not found in configuration",
                     node_name
                 )
+                success = False
 
         except Exception as e:
             logging.error(
                 "[Driver] Failed removing node from JSON: %s",
                 e
             )
+            success = False
+
+        # ACK Remove Node
+        self.event_bus.publish("ACK_REMOVE_NODE", {
+            "node": node_name,
+            "success": success
+        })
 
         # reconcile system
         self.reload_config()

@@ -39,6 +39,7 @@ class DisplayUI:
 
         # Event subscriptions
         self.bus.subscribe("STOP_SYSTEM", self._handle_stop_system)
+        self.bus.subscribe("ACK_REMOVE_NODE", self._handle_ack_remove)
         self.bus.subscribe("DEVICE_LIST_UPDATED", self._handle_device_list_update)
 
         # Establish screen resolution
@@ -72,6 +73,14 @@ class DisplayUI:
     def _handle_stop_system(self, payload=None):
         """Backend-initiated shutdown -> Shutdown UI Loop"""
         self._running = False
+
+    def _handle_ack_remove(self, payload):
+        node = payload.get("node")
+        success = payload.get("success")
+
+        print(f"ACK_REMOVE NODE received for {node}, success={success}")
+        if isinstance(self.current_screen, MainScreen):
+            self.current_screen._exit_remove_mode()
 
     def _handle_device_list_update(self, devices):
         print("inside _handle_device_list_update")

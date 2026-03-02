@@ -322,6 +322,7 @@ class MainScreen(BaseScreen):
     def _exit_remove_mode(self):
         self.remove_mode = False
         self.remove_icons.clear()
+        self._build_device_buttons()
 
     def _confirm_remove(self, device_name):
         # Remove from backend by calling ui_control method

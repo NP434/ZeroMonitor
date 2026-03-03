@@ -48,3 +48,7 @@ Thumbs.db
 # Pygame / runtime caches
 *.log
 *.tmp
+Initialization/cert_gen.sh
+Initialization/cert_gen.sh
+Pairing/certs/server.crt
+Pairing/certs/server.key

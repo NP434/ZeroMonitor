@@ -2,6 +2,7 @@
 Docstring for ui.widgets.SidebarPanel
 """
 import pygame
+import ui.theme as theme
 from ui.widgets.Button import Button
 
 class SidebarPanel:
@@ -76,6 +77,7 @@ class SidebarPanel:
         # Background
         rect = pygame.Rect(self.x, self.y, self.current_width, self.height)
         pygame.draw.rect(surface, self.bg_color, rect)
+        pygame.draw.line(surface, theme.WHITE, rect.topright, rect.bottomright, 1)
 
         # Draw toggle button
         self.toggle_button.draw(surface)

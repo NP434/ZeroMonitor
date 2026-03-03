@@ -16,7 +16,7 @@ class Button:
         self.text = text
         self.image = image
         self.font = font or theme.DEFAULT_FONT
-        self.bg_color = bg_color or theme.BUTTON_BG
+        self.bg_color = bg_color
         self.text_color = text_color or theme.BUTTON_TEXT
         self.border_radius = border_radius or theme.BUTTON_RADIUS
 
@@ -45,7 +45,8 @@ class Button:
         return font, text + elipsis
         
     def draw(self, surface):
-        pygame.draw.rect(surface, self.bg_color, self.rect, border_radius=self.border_radius)
+        if self.bg_color:
+            pygame.draw.rect(surface, self.bg_color, self.rect, border_radius=self.border_radius)
 
         if self.image:
             img_rect = self.image.get_rect(center=self.rect.center)

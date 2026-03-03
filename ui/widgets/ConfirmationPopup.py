@@ -60,6 +60,11 @@ class ConfirmationPopup:
         if not self.open:
             return
 
+        # Dim background 
+        overlay = pygame.Surface((self.app.width, self.app.height), pygame.SRCALPHA) 
+        overlay.fill((0, 0, 0, 120)) 
+        surface.blit(overlay, (0, 0))
+
         # Background box
         pygame.draw.rect(surface, theme.GRAY, self.rect, border_radius=10)
         pygame.draw.rect(surface, theme.WHITE, self.rect, width=2, border_radius=10)

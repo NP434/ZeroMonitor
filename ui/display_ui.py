@@ -55,7 +55,7 @@ class DisplayUI:
         # Register screens
         self.screens = {
             "main": MainScreen(self),
-            "settings": SettingsScreen (self)
+            "settings": SettingsScreen (self),
         }
 
         # Starting on the main screen

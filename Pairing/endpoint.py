@@ -13,9 +13,9 @@ KEY_FILE = BASE_DIR / "uploaded_key.pub"
 PK_FILE = BASE_DIR / "Pdata.json"
 
 # Create and store key in location
-pairing_key = token_hex(4)
-pdat = {"Pairing_Key": pairing_key,
-        "Command": 'Curl -k -H "P-Key:[insert key here]" "$SERVER_URL/transfer" -o retrieved_key.pub'}
+pairing_token = token_hex(4)
+pdat = {"pairing_token": pairing_token,
+        f"Command": 'Curl -k -H "P-Key:{pairing_token}" "192.168.0.106:8443/transfer" -o retrieved_key.pub'}
 with open(PK_FILE, "w") as f:
     json.dump(pdat,f)
 
@@ -26,6 +26,8 @@ endpoint_active = True
 @app.route("/transfer", methods=["GET","POST"])
 def example():
     global endpoint_active
+
+    
     if not endpoint_active:
         abort(410, "Endpoint closed")
     
@@ -43,7 +45,7 @@ def example():
         provided_key = request.headers.get("P-Key")
 
 
-        if provided_key != pairing_key:
+        if provided_key != pairing_token:
             abort(403, "Unauthorized")
         # Handles retreiveing data
         if not KEY_FILE.exists():
@@ -54,14 +56,17 @@ def example():
         return send_file(KEY_FILE, mimetype="text/plain")
     
     return "SSH key received", 200
+@app.route("/stat", methods=["GET"])
+def stat():
+    return {"active": endpoint_active}, 200
 
 if __name__ == "__main__":
     print("\n Pairing Key ")
-    print(f"{pairing_key}")
+    print(f"{pairing_token}")
     print("-----------------")
 
     app.run(
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=8443,
         ssl_context=(CERT_DIR / "server.crt",
                      CERT_DIR / "server.key")

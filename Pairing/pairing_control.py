@@ -4,6 +4,7 @@
 import logging
 from event_bus import EventBus
 import subprocess
+import json
 
 script = "./Pairing/transfer.sh"
 
@@ -14,8 +15,12 @@ class ControlPairing:
         self.logger = logging.getlogger("pairing")
         self.bus.subscribe("ADD_NODE", self.add_node)
     
-    def add_node(self):
+    def add_node(self, node_config:dict):
         """Handle the add node event but activating transfer and returning device info"""
+        hostname = node_config.get("hostname")
+        user = node_config.get("user")
         subprocess.run([script],check=True)
+        
+
         
 

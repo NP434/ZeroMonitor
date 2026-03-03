@@ -1,5 +1,6 @@
 import pygame
 import ui.theme as theme
+import ui.utilities as utilities
 from ui.widgets.Button import Button
 
 class ConfirmationPopup:
@@ -61,9 +62,7 @@ class ConfirmationPopup:
             return
 
         # Dim background 
-        overlay = pygame.Surface((self.app.width, self.app.height), pygame.SRCALPHA) 
-        overlay.fill((0, 0, 0, 120)) 
-        surface.blit(overlay, (0, 0))
+        utilities.dim_background(self.app, surface)
 
         # Background box
         pygame.draw.rect(surface, theme.GRAY, self.rect, border_radius=10)

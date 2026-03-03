@@ -15,3 +15,8 @@ def get_event_pos(event, app):
         return event.pos
 
     return None
+
+def dim_background(app, surface):
+    overlay = pygame.Surface((app.width, app.height), pygame.SRCALPHA) 
+    overlay.fill((0, 0, 0, 120)) 
+    surface.blit(overlay, (0, 0))

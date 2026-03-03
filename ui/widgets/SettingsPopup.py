@@ -4,6 +4,7 @@ Settings Popup to allow users to choose between device and system settings
 import pygame
 from ui.widgets.Button import Button
 import ui.theme as theme
+import ui.utilities as utilities
 
 class SettingsPopup:
     def __init__(self, app):
@@ -46,6 +47,34 @@ class SettingsPopup:
         if not self.open:
             return
 
+        pos = utilities.get_event_pos(event, self.app)
+        if pos is None:
+            return
+
+        if self.system_btn.is_clicked(pos):
+            self.app.change_screen("systemsettings")
+            self.open = False
+            return
+
+        if self.device_btn.is_clicked(pos):
+            self.app.change_screen("settings") # change to "devicesettings"
+            self.open = False
+            return
+
+        if self.cancel_btn.is_clicked(pos):
+            self.open = False
+            return
+
     def draw(self):
         if not self.open:
             return
+
+        # Draw box
+
+        # Draw buttons
+
+        
+
+        
+
+

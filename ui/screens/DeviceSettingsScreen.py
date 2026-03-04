@@ -45,8 +45,24 @@ class DeviceSettingsScreen(BaseScreen):
 
             y += h + 10
 
-    def handle_event(self, event):
+    def _build_settings_buttons(self):
         pass
+
+    def handle_event(self, event):
+
+        if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN): 
+            return
+            
+        pos = utilities.get_event_pos(event, self.app)
+        if pos is None:
+            return
+
+        for name, btn in self.device_buttons.items(): 
+            r = btn.rect.move(0, self.scroll_offset) 
+            if r.collidepoint(pos): 
+                self.selected_device = name 
+                #self._build_settings_buttons() 
+                return
 
     def draw(self, surface):
         surface.fill(theme.BLACK)
@@ -62,7 +78,7 @@ class DeviceSettingsScreen(BaseScreen):
             if name == self.selected_device:
                 pygame.draw.rect(surface, theme.YELLOW, r, border_radius=10)
 
-            btn.draw(surface)
+            btn.draw(surface, override_rect=r)
 
     def _build_settings_buttons():
         pass

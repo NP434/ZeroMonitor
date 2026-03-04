@@ -9,16 +9,18 @@ class Button:
                  font=None, 
                  bg_color=None, 
                  text_color=None, 
-                 border_radius=None
+                 border_radius=None,
+                 align = "center"
     ):
         
         self.rect = pygame.Rect(rect)
         self.text = text
         self.image = image
         self.font = font or theme.DEFAULT_FONT
-        self.bg_color = bg_color or theme.BUTTON_BG
+        self.bg_color = bg_color
         self.text_color = text_color or theme.BUTTON_TEXT
         self.border_radius = border_radius or theme.BUTTON_RADIUS
+        self.align = align
 
     def _fit_text(self, text, max_width):
         font = self.font
@@ -44,20 +46,31 @@ class Button:
 
         return font, text + elipsis
         
-    def draw(self, surface):
-        pygame.draw.rect(surface, self.bg_color, self.rect, border_radius=self.border_radius)
+    def draw(self, surface, override_rect=None):
+        rect = override_rect or self.rect
+
+        if self.bg_color:
+            pygame.draw.rect(surface, self.bg_color, rect, border_radius=self.border_radius)
 
         if self.image:
-            img_rect = self.image.get_rect(center=self.rect.center)
+            img_rect = self.image.get_rect(center=rect.center)
             surface.blit(self.image, img_rect)
+        
         else:
             # Fit the text
-            max_text_width = self.rect.width - 10
+            max_text_width = rect.width - 10
             font_to_use, fitted_text = self._fit_text(self.text, max_text_width)
 
             text_surf = font_to_use.render(fitted_text, True, self.text_color)
-            text_rect = text_surf.get_rect(center = self.rect.center)
+            text_rect = text_surf.get_rect(center = rect.center)
+
+            if self.align == "left":
+                text_rect.midleft = (rect.x + 12, rect.centery)
+            else:
+                text_rect.center = rect.center
+
             surface.blit(text_surf, text_rect)
+
 
     def is_clicked(self, pos):
         return self.rect.collidepoint(pos)

@@ -37,6 +37,7 @@ class MainScreen(BaseScreen):
         settings_y = 20
         self.settings_button = Button(
             rect=(settings_x, settings_y, settings_width, settings_height),
+            bg_color=theme.BLUE,
             text="Settings"
         )
 
@@ -112,7 +113,6 @@ class MainScreen(BaseScreen):
             if self.settings_button.is_clicked(pos):
                 self.popup = SettingsPopup(self.app, self.settings_button.rect)
                 return
-                #self.app.change_screen("settings")
             
             # Clock button clicked
             if self.clock_button.is_clicked(pos):

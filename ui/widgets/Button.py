@@ -9,7 +9,8 @@ class Button:
                  font=None, 
                  bg_color=None, 
                  text_color=None, 
-                 border_radius=None
+                 border_radius=None,
+                 align = "center"
     ):
         
         self.rect = pygame.Rect(rect)
@@ -19,6 +20,7 @@ class Button:
         self.bg_color = bg_color
         self.text_color = text_color or theme.BUTTON_TEXT
         self.border_radius = border_radius or theme.BUTTON_RADIUS
+        self.align = align
 
     def _fit_text(self, text, max_width):
         font = self.font
@@ -58,7 +60,14 @@ class Button:
 
             text_surf = font_to_use.render(fitted_text, True, self.text_color)
             text_rect = text_surf.get_rect(center = self.rect.center)
+
+            if self.align == "left":
+                text_rect.midleft = (self.rect.x + 12, self.rect.centery)
+            else:
+                text_rect.center = self.rect.center
+
             surface.blit(text_surf, text_rect)
+
 
     def is_clicked(self, pos):
         return self.rect.collidepoint(pos)

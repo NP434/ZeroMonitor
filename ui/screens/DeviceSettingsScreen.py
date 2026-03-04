@@ -39,7 +39,8 @@ class DeviceSettingsScreen(BaseScreen):
                 text=name,
                 bg_color=None,
                 text_color=theme.WHITE,
-                border_radius=10
+                border_radius=10,
+                align="left"
             )
 
             y += h + 10

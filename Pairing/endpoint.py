@@ -6,6 +6,7 @@ from flask import Flask, request,abort,send_file
 from pathlib import Path
 from secrets import token_hex
 import json
+import threading
 
 BASE_DIR = Path(__file__).resolve().parent
 CERT_DIR = BASE_DIR / "certs"
@@ -20,14 +21,14 @@ with open(PK_FILE, "w") as f:
     json.dump(pdat,f)
 
 app = Flask(__name__)
+close = threading.Event()
 
 endpoint_active = True
 
 @app.route("/transfer", methods=["GET","POST"])
 def example():
-    global endpoint_active
+  
 
-    
     if not endpoint_active:
         abort(410, "Endpoint closed")
     
@@ -50,15 +51,21 @@ def example():
         # Handles retreiveing data
         if not KEY_FILE.exists():
             abort(404, "No data stored")   
-        endpoint_active = False
+        
+        close.set()
         PK_FILE.unlink(missing_ok=True)
 
         return send_file(KEY_FILE, mimetype="text/plain")
     
     return "SSH key received", 200
+
 @app.route("/stat", methods=["GET"])
 def stat():
-    return {"active": endpoint_active}, 200
+    closed = close.wait(timeout = 120)
+    if closed:
+        return {"stat": "retrieved"}, 200
+    else:
+        return {"stat": "timeout"}, 200
 
 if __name__ == "__main__":
     print("\n Pairing Key ")

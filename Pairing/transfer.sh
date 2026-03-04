@@ -6,10 +6,15 @@ set -e
 
 ### Setting File locations ###
 echo "Setting File Paths"
+JSON_INT="Pairing/json_interpreter.py"
 SSH_KEY="$HOME/.ssh/id_rsa.pub"
 SERVER_APP="Pairing/endpoint.py"
 SERVER_URL="https://127.0.0.1:8443"
 DEVICE_LIST="device_list.json"
+
+### setting varaibles ###
+UN="$1"
+HN="$2"
 
 if [ ! -f "$SSH_KEY" ]; then
   echo "[*] SSH key does not exits."
@@ -33,34 +38,22 @@ curl -k -X POST \
   --data-binary @"$SSH_KEY" \
 "$SERVER_URL/transfer"
 
-# Chcek if key has been retrieved and timer for endpoint expiration
-TIMEOUT=120  # seconds
-ELAPSED=0
+STATUS=$(curl -sk "$SERVER_URL/stat" | python3 -c "import sys,json; print(json.load(sys.stdin)['stat'])")
 
-while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
-    STATUS=$(curl -sk "$SERVER_URL/stat" | jq -r '.active')
-    if [ "$STATUS" = "false" ]; then
-        echo "[*] Pairing key retrieved, shutting down Flask endpoint..."
-        kill $FLASK_PID
-        End_reason="closed"
-        break
-    fi
-    sleep 1
-    ELAPSED=$((ELAPSED + 1))
-done
-
-if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
-    echo "[!] Timeout reached, shutting down Flask endpoint..."
-    kill $FLASK_PID
-    End_reason="timeout"
+if [ "$STATUS" = "False" ]; then
+  if OS_INFO=$(ssh -i "$HOME/.ssh/id_rsa" "$UN@$HN" 'cat /etc/os-release' 2>/dev/null); then
+    echo "$OS_INFO"
+  elif OS_INFO=$(ssh -i "$HOME/.ssh/id_rsa" "$UN@$HN" 'ver' 2>/dev/null); then
+    echo "$OS_INFO"
+  else
+    echo "OS_Unknown"
+  fi
+else
+    echo "OS_Unknown"
 fi
 
-if ["$End_reason" = "closed"] then
-    echo "Enter UserName on target device"
-    read UN
-    echo "Enter HostName of target device"
-    read HN
+kill $FLASK_PID
 
-    OS_INFO=$(ssh -i $HOME/.ssh/id_rsa "$UN@$HN" 'cat /etc/os-release' )
-    echo "$OS_INFO"
+
+
 

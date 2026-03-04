@@ -52,7 +52,7 @@ class DeviceSettingsScreen(BaseScreen):
 
         if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN): 
             return
-            
+
         pos = utilities.get_event_pos(event, self.app)
         if pos is None:
             return
@@ -76,7 +76,7 @@ class DeviceSettingsScreen(BaseScreen):
 
             # Highlight selected device
             if name == self.selected_device:
-                pygame.draw.rect(surface, theme.YELLOW, r, border_radius=10)
+                pygame.draw.rect(surface, theme.YELLOW, r, border_radius=20, width=2)
 
             btn.draw(surface, override_rect=r)
 

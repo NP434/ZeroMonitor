@@ -2,8 +2,15 @@
 # Fake Event Bus and Metric Event classes for testing purposes. In a real implementation,
 # these would be provided by the actual event system in use and would likely have more complex structures
 # and behaviors.
-'''
+
 import time
+import json
+import os
+import smtplib
+import ssl
+from email.message import EmailMessage
+from typing import Optional
+
 
 class FakeEventBus:
     def __init__(self):
@@ -13,22 +20,20 @@ class FakeEventBus:
         self.subscribers.setdefault(event_type, []).append(callback)
 
     def publish(self, event_type, data):
-        print(f"Event Published: {event_type} → {event_type}: {data}")
-        print(data)
+        # Single debug print (shows event type and payload once)
+        print(f"Event Published: {event_type} → {data}")
 
         if event_type in self.subscribers:
             for callback in self.subscribers[event_type]:
                 callback(data)
 
 
-
 class FakeMetricEvent:
     def __init__(self, node, payload):
         self.node = node
         self.payload = payload
-        self.timestamp = time.time()
+        self.timestamp = time.ctime()
         self.success = True
-'''
 
 
 # Data Interpreter Module
@@ -49,13 +54,32 @@ class DataInterpreter:
         "cpu_temp_c": 5.0,
     }
 
-    def __init__(self, event_bus):
+    def __init__(
+        self,
+        event_bus,
+        json_filepath: str = "data_output.json",
+        smtp_server: Optional[str] = None,
+        smtp_port: Optional[int] = None,
+        smtp_user: Optional[str] = None,
+        smtp_password: Optional[str] = None,
+        email_from: Optional[str] = None,
+        email_to: Optional[str] = None,
+    ):
         self.event_bus = event_bus
         self.thresholds = self.DEFAULT_THRESHOLDS.copy()
         self.device_thresholds = {}
 
         # Tracks current alert state: {(node, metric): bool}
         self.alert_state = {}
+
+        # Persistence and email config
+        self.json_filepath = json_filepath
+        self.smtp_server = smtp_server
+        self.smtp_port = smtp_port
+        self.smtp_user = smtp_user
+        self.smtp_password = smtp_password
+        self.email_from = email_from
+        self.email_to = email_to
 
         self.event_bus.subscribe("METRIC_EVENT", self.interpret_data)
 
@@ -81,6 +105,21 @@ class DataInterpreter:
 
         # Annotate severities so they're always present in the published interpreted data
         interpreted = self._annotate_severity(interpreted)
+
+        # Persist interpreted metrics to JSON file (updates per-node entry)
+        try:
+            self._write_to_json_file(interpreted)
+        except Exception:
+            # swallow persistence errors to not break pipeline
+            pass
+
+        # If any severity is 'warning', attempt to send an email alert
+        try:
+            if any(s == "warning" or "critical" or "severe" for s in interpreted.get("severities", {}).values() if s is not None):
+                self._send_warning_email(interpreted)
+        except Exception:
+            # swallow email errors
+            pass
 
         # Publish interpreted metrics (now always includes a 'severities' map)
         self.event_bus.publish("data_interpreted", interpreted)
@@ -154,6 +193,74 @@ class DataInterpreter:
         interpreted["severities"] = severities
         return interpreted
 
+    # Persistence: write/update JSON file with latest interpreted data per node
+    def _write_to_json_file(self, interpreted):
+        data = {}
+        filepath = self.json_filepath
+
+        # Ensure directory exists
+        dirpath = os.path.dirname(filepath)
+        if dirpath and not os.path.exists(dirpath):
+            os.makedirs(dirpath, exist_ok=True)
+
+        # Load existing
+        if os.path.exists(filepath):
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+
+        # Update node entry
+        node = interpreted.get("node")
+        if node is None:
+            return
+
+        # Store the interpreted dict (safe types) under node key
+        data[node] = interpreted
+
+        # Write back atomically
+        tmp_path = f"{filepath}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, sort_keys=True)
+        os.replace(tmp_path, filepath)
+
+    # Email Logic (need to find where to acquire the user's email address for the "to" field,
+    # maybe in device_list.json or a separate config file? For now it's just env vars)
+    '''
+    # Email sending for warnings (no-op if SMTP not configured)
+    def _send_warning_email(self, interpreted):
+        if not (self.smtp_server and self.smtp_port and self.email_from and self.email_to):
+            # SMTP not configured: skip sending
+            return
+
+        subject = f"Warning: metrics for {interpreted.get('node')}"
+        body = json.dumps(interpreted, indent=2, sort_keys=True)
+
+        msg = EmailMessage()
+        msg["From"] = self.email_from
+        msg["To"] = self.email_to
+        msg["Subject"] = subject
+        msg.set_content(body)
+
+
+        # Email sending with SSL/TLS if port is 465, otherwise starttls. Login if credentials provided.
+        
+        # Choose connection method
+        context = ssl.create_default_context()
+        if self.smtp_port == 465:
+            with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, context=context) as server:
+                if self.smtp_user and self.smtp_password:
+                    server.login(self.smtp_user, self.smtp_password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls(context=context)
+                if self.smtp_user and self.smtp_password:
+                    server.login(self.smtp_user, self.smtp_password)
+                server.send_message(msg)
+    '''
+
     # Alert Evaluation
     def check_thresholds(self, interpreted):
         node = interpreted["node"]
@@ -215,8 +322,6 @@ class DataInterpreter:
             return "severe"
 
 
-# Example usage with fake events
-'''
 event = FakeEventBus()
 interpreter = DataInterpreter(event)
 
@@ -231,7 +336,6 @@ event.publish("METRIC_EVENT", FakeMetricEvent(
     }
 ))
 
-
 event.publish("METRIC_EVENT", FakeMetricEvent(
     node="server-2",
     payload={
@@ -242,4 +346,3 @@ event.publish("METRIC_EVENT", FakeMetricEvent(
         "disk_used_percent": 60,
     }
 ))
-'''

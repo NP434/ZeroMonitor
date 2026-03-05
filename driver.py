@@ -103,6 +103,7 @@ class Driver:
     def remove_node(self, node_name: str):
         """System-level node removal"""
 
+        success = False
         logging.info("[Driver] Removing node: %s", node_name)
 
         # Stop the running worker
@@ -133,17 +134,26 @@ class Driver:
                     "[Driver] Node '%s' removed from configuration",
                     node_name
                 )
+                success = True
             else:
                 logging.warning(
                     "[Driver] Node '%s' not found in configuration",
                     node_name
                 )
+                success = False
 
         except Exception as e:
             logging.error(
                 "[Driver] Failed removing node from JSON: %s",
                 e
             )
+            success = False
+
+        # ACK Remove Node
+        self.event_bus.publish("ACK_REMOVE_NODE", {
+            "node": node_name,
+            "success": success
+        })
 
         # reconcile system
         self.reload_config()
@@ -228,14 +238,8 @@ class Driver:
         self.polling_agent.reconcile(nodes)
 
         # Publish device list to UI
-        device_list = []
-        for n in nodes:
-            device_list.append({
-                "name": n.name,
-                "hostname": n.provider.conn.host,
-                "operating_system": n.provider.__class__.__name__.replace("MetricsProvider", ""),
-                "polling_frequency": n.interval
-            })
+        with open ("device_list.json", "r") as f:
+            device_list = load(f)
         self.event_bus.publish("DEVICE_LIST_UPDATED", device_list)
 
 

@@ -9,6 +9,7 @@ class Slider:
 
     def __init__(
             self,
+            app,
             rect,
             min_value=0,
             max_value=100,
@@ -19,6 +20,7 @@ class Slider:
             text_color=None,
             on_change=None
         ):
+        self.app = app
         self.rect = pygame.Rect(rect)
         self.min_value = min_value
         self.max_value = max_value
@@ -36,16 +38,43 @@ class Slider:
         self.dragging = False
 
     def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if self._handle_rect().collidepoint(event.pos):
+
+        # --- DOWN EVENTS ---
+        if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN):
+
+            # Determine position based on event type
+            if event.type == pygame.FINGERDOWN:
+                # Finger coordinates are normalized (0.0 - 1.0)
+                pos = (
+                    int(event.x * self.app.width),
+                    int(event.y * self.app.height)
+                )
+            else:
+                # Mouse event provides pixel coordinates
+                pos = event.pos
+
+            if self._handle_rect().collidepoint(pos):
                 self.dragging = True
 
-        elif event.type == pygame.MOUSEBUTTONUP:
+        # --- UP EVENTS ---
+        elif event.type in (pygame.MOUSEBUTTONUP, pygame.FINGERUP):
             self.dragging = False
 
-        elif event.type == pygame.MOUSEMOTION and self.dragging:
-            x = event.pos[0]
-            x = max(self.rect.left, min(event.pos[0], self.rect.right))
+        # --- MOTION EVENTS
+        elif event.type in (pygame.MOUSEMOTION, pygame.FINGERMOTION) and self.dragging:
+
+            # Determine position based on event type
+            if event.type == pygame.FINGERMOTION:
+            # Finger coordinates are normalized (0.0 - 1.0)
+                pos = (
+                    int(event.x * self.app.width),
+                    int(event.y * self.app.height)
+                )
+            else:
+            # Mouse event provides pixel coordinates
+                pos = event.pos
+
+            x = max(self.rect.left, min(pos[0], self.rect.right))
             ratio = (x - self.rect.left) / self.rect.width
             new_value = self.min_value + ratio * (self.max_value - self.min_value)
 

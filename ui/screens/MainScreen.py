@@ -4,6 +4,7 @@ from ui.screens.BaseScreen import BaseScreen
 from ui.widgets.Button import Button
 from ui.widgets.SidebarPanel import SidebarPanel
 from ui.widgets.ConfirmationPopup import ConfirmationPopup
+from ui.widgets.SettingsPopup import SettingsPopup
 import ui.theme as theme
 
 class MainScreen(BaseScreen):
@@ -36,6 +37,7 @@ class MainScreen(BaseScreen):
         settings_y = 20
         self.settings_button = Button(
             rect=(settings_x, settings_y, settings_width, settings_height),
+            bg_color=theme.BLUE,
             text="Settings"
         )
 
@@ -50,6 +52,7 @@ class MainScreen(BaseScreen):
 
         # Create sidebar panel
         self.sidebar = SidebarPanel(
+            self.app,
             x=0,
             y=0,
             width_expanded=250,
@@ -108,7 +111,8 @@ class MainScreen(BaseScreen):
 
             # Settings button clicked
             if self.settings_button.is_clicked(pos):
-                self.app.change_screen("settings")
+                self.popup = SettingsPopup(self.app, self.settings_button.rect)
+                return
             
             # Clock button clicked
             if self.clock_button.is_clicked(pos):
@@ -314,6 +318,7 @@ class MainScreen(BaseScreen):
 
     def _enter_remove_mode(self):
         self.remove_mode = True
+        self.remove_icons.clear()
         self._build_device_buttons()
         self._build_remove_icons()
 
@@ -325,7 +330,6 @@ class MainScreen(BaseScreen):
     def _confirm_remove(self, device_name):
         # Remove from backend by calling ui_control method
         self.app.ui_control.remove_node(device_name)
-        self._exit_remove_mode()
 
     def _build_remove_icons(self):
         icon_size = 40

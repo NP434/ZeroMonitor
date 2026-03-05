@@ -26,6 +26,7 @@ class SettingsScreen(BaseScreen):
 
         # Brightness Slider
         self.brightness_slider = Slider(
+            self.app,
             rect=(200, 200, 600, 20),
             min_value=0,
             max_value=100,

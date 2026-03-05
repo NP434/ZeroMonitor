@@ -61,6 +61,8 @@ class DeviceSettingsScreen(BaseScreen):
         if not self.selected_device:
             return
 
+        device = self._get_device(self.selected_device)
+
         start_x = self.app.width - 250
         start_y = 40
         spacing = 70
@@ -70,7 +72,7 @@ class DeviceSettingsScreen(BaseScreen):
             self.app,
             pygame.Rect(start_x, start_y, 200, 40),
             ["Low", "Medium", "High", "Custom"],
-            default="Medium" #device.get("poll_rate", "Medium")
+            default=device.get("poll_rate", "Medium")
         )
 
         self.device_settings_widgets.append(("poll_rate", poll_dropdown))

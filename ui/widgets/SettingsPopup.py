@@ -64,7 +64,7 @@ class SettingsPopup:
             return
 
         if self.system_btn.is_clicked(pos):
-            self.app.change_screen("settings")
+            self.app.change_screen("systemsettings")
             self.open = False
             return
 

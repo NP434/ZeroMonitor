@@ -9,6 +9,7 @@ from ui.screens.BaseScreen import BaseScreen
 from ui.widgets.Button import Button
 from ui.widgets.Slider import Slider
 import ui.theme as theme
+import ui.utilities as utilities
 
 class SystemSettingsScreen(BaseScreen):
     """
@@ -18,10 +19,23 @@ class SystemSettingsScreen(BaseScreen):
         super().__init__(app)
         self.load_assets()
 
-        # Back button
-        self.back_button = Button(
-            rect=(20, 20, 160, 60),
-            text="Back"
+        self.load_assets()
+        house_icon = pygame.transform.smoothscale(self.assets["house.png"], (30,30))
+        settings_icon = pygame.transform.smoothscale(self.assets["settings.png"], (30,30))
+
+        # Navigation buttons
+        self.home_btn = Button(
+            pygame.Rect(20, 20, 50, 50),
+            image=house_icon,
+            bg_color=theme.YELLOW,
+            border_radius=10
+        )
+
+        self.device_btn = Button(
+            pygame.Rect(80, 20, 50, 50),
+            image=settings_icon,
+            bg_color=theme.PURPLE,
+            border_radius=10
         )
 
         # Brightness Slider
@@ -42,25 +56,28 @@ class SystemSettingsScreen(BaseScreen):
         pass
 
     def handle_event(self, event):
-        self.brightness_slider.handle_event(event)
-        
-        if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
-            if event.type == pygame.FINGERDOWN:
-                pos = (
-                    int(event.x * self.app.width),
-                    int(event.y * self.app.height)
-                )
-            else:
-                pos = event.pos
 
-            if self.back_button.is_clicked(pos):
+        pos = utilities.get_event_pos(event, self.app)
+        if pos is None:
+            return
+
+        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN):
+            if self.home_btn.is_clicked(pos):
                 self.app.change_screen("main")
+                return
+
+            if self.device_btn.is_clicked(pos):
+                self.app.change_screen("devicesettings")
+                return
+
+        self.brightness_slider.handle_event(event)
 
     def draw(self, surface):
         surface.fill(theme.GRAY)
 
-        # Draw back button
-        self.back_button.draw(surface)
+        # Draw navigation buttons
+        self.home_btn.draw(surface)
+        self.device_btn.draw(surface)
 
         # Draw title
         title = theme.DEFAULT_FONT.render("Settings", True, theme.WHITE)

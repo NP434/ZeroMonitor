@@ -13,12 +13,32 @@ class DeviceSettingsScreen(BaseScreen):
     def __init__(self, app):
         super().__init__(app)
 
+        # Load assets
+        self.load_assets()
+        house_icon = pygame.transform.smoothscale(self.assets["house.png"], (30,30))
+        settings_icon = pygame.transform.smoothscale(self.assets["settings.png"], (30,30))
+
+
         self.sidebar_width = 260
         self.scroll_offset = 0
 
         self.selected_device = None
         self.device_buttons = {}
         self.device_settings_widgets = []
+
+        self.home_btn = Button(
+            pygame.Rect(self.sidebar_width + 10, 20, 50, 50),
+            image=house_icon,
+            bg_color=theme.YELLOW,
+            border_radius=20
+        )
+
+        self.system_btn = Button(
+            pygame.Rect(self.sidebar_width + 70, 20, 50, 50),
+            image=settings_icon,
+            bg_color=theme.PURPLE,
+            border_radius=20
+        )
 
         self._build_device_list()
 
@@ -89,6 +109,13 @@ class DeviceSettingsScreen(BaseScreen):
         if pos is None:
             return
 
+        # Navigation buttons
+        if self.home_btn.is_clicked(pos):
+            self.app.change_screen("main")
+        
+        if self.system_btn.is_clicked(pos):
+            self.app.change_screen("systemsettings")
+
         # Device selection on left sidebar
         for name, btn in self.device_buttons.items(): 
             r = btn.rect.move(0, self.scroll_offset) 
@@ -113,6 +140,10 @@ class DeviceSettingsScreen(BaseScreen):
 
         # Left sidebar background 
         pygame.draw.rect(surface, theme.GRAY, (0, 0, self.sidebar_width, self.app.height))
+
+        # Navigation buttons
+        self.home_btn.draw(surface)
+        self.system_btn.draw(surface)
 
         # Device buttons
         for name, btn in self.device_buttons.items():

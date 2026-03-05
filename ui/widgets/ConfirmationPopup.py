@@ -2,6 +2,7 @@ import pygame
 import ui.theme as theme
 import ui.utilities as utilities
 from ui.widgets.Button import Button
+import ui.utilities as utilities
 
 class ConfirmationPopup:
     def __init__(self, app, message, on_confirm, on_cancel):
@@ -35,17 +36,8 @@ class ConfirmationPopup:
         if not self.open:
             return
 
+        pos = utilities.get_event_pos(event, self.app)
         if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
-            # Determine position based on event type
-            if event.type == pygame.FINGERDOWN:
-                # Finger coordinates are normalized (0.0 - 1.0)
-                pos = (
-                    int(event.x * self.app.width),
-                    int(event.y * self.app.height)
-                )
-            else:
-                # Mouse event provides pixel coordinates
-                pos = event.pos
 
             if self.confirm_yes.is_clicked(pos):
                 self.on_confirm()

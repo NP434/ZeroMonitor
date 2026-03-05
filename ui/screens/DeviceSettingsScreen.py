@@ -18,7 +18,7 @@ class DeviceSettingsScreen(BaseScreen):
 
         self.selected_device = None
         self.device_buttons = {}
-        self.poll_dropdown = None
+        self.device_settings_widgets = []
 
         self._build_device_list()
 
@@ -48,6 +48,36 @@ class DeviceSettingsScreen(BaseScreen):
     def _build_settings_buttons(self):
         pass
 
+    def _get_device(self, name):
+        for d in self.app.devices:
+            if d["name"] == name:
+                return d
+        return None
+
+    def _build_settings_widgets(self):
+        """ Builds device specific widgets when a device is selected """
+        self.device_settings_widgets = []
+
+        if not self.selected_device:
+            return
+
+        start_x = self.app.width - 250
+        start_y = 40
+        spacing = 70
+
+        # Build Polling dropdown for each device
+        poll_dropdown = DropDown(
+            self.app,
+            pygame.Rect(start_x, start_y, 200, 40),
+            ["Low", "Medium", "High", "Custom"],
+            default="Medium" #device.get("poll_rate", "Medium")
+        )
+
+        self.device_settings_widgets.append(("poll_rate", poll_dropdown))
+        #
+        #Add more widgets here later
+        #
+
     def handle_event(self, event):
 
         if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN): 
@@ -57,12 +87,25 @@ class DeviceSettingsScreen(BaseScreen):
         if pos is None:
             return
 
+        # Device selection on left sidebar
         for name, btn in self.device_buttons.items(): 
             r = btn.rect.move(0, self.scroll_offset) 
             if r.collidepoint(pos): 
                 self.selected_device = name 
-                #self._build_settings_buttons() 
+                self._build_settings_widgets()
                 return
+
+        # Settings widgets on the right side
+        if self.selected_device:
+            result = self.poll_dropdown.handle_event(event)
+            for key, widget in self.device_settings_widgets:
+                result = widget.handle_event(event)
+                if result is not None:
+                    device = self._get_device(self.selected_device)
+                    device[key] = result
+
+                    # Publish events here
+
 
     def draw(self, surface):
         surface.fill(theme.BLACK)
@@ -80,5 +123,7 @@ class DeviceSettingsScreen(BaseScreen):
 
             btn.draw(surface, override_rect=r)
 
-    def _build_settings_buttons():
-        pass
+        # Right side settings panel
+        if self.selected_device:
+            for key, widget in self.device_settings_widgets:
+                widget.draw(surface)

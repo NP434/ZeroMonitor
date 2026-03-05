@@ -10,7 +10,7 @@ from ui.widgets.Button import Button
 from ui.widgets.Slider import Slider
 import ui.theme as theme
 
-class SettingsScreen(BaseScreen):
+class SystemSettingsScreen(BaseScreen):
     """
     Screen for users to change settings of Zero Monitor device
     """

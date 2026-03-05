@@ -97,7 +97,6 @@ class DeviceSettingsScreen(BaseScreen):
 
         # Settings widgets on the right side
         if self.selected_device:
-            result = self.poll_dropdown.handle_event(event)
             for key, widget in self.device_settings_widgets:
                 result = widget.handle_event(event)
                 if result is not None:

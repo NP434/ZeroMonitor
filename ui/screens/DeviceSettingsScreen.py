@@ -140,6 +140,7 @@ class DeviceSettingsScreen(BaseScreen):
 
         # Left sidebar background 
         pygame.draw.rect(surface, theme.GRAY, (0, 0, self.sidebar_width, self.app.height))
+        pygame.draw.line(surface, theme.WHITE, (self.sidebar_width, 0), (self.sidebar_width, self.app.height))
 
         # Navigation buttons
         self.home_btn.draw(surface)

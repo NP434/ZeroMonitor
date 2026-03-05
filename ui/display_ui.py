@@ -11,6 +11,7 @@ import json
 import sys
 from ui.screens.MainScreen import MainScreen
 from ui.screens.SettingsScreen import SettingsScreen
+from ui.screens.AddScreen import AddScreen
 
 # initialize pygame
 pygame.init()
@@ -54,7 +55,8 @@ class DisplayUI:
         # Register screens
         self.screens = {
             "main": MainScreen(self),
-            "settings": SettingsScreen (self)
+            "settings": SettingsScreen (self),
+            "add_device": AddScreen(self)
         }
 
         # Starting on the main screen

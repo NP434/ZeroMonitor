@@ -26,6 +26,7 @@ class DeviceSettingsScreen(BaseScreen):
         self.device_buttons = {}
         self.device_settings_widgets = []
         self.unsaved_changes = False
+        self.confirm_popup = None
 
         self.home_btn = Button(
             pygame.Rect(self.sidebar_width + 10, 20, 50, 50),
@@ -108,6 +109,18 @@ class DeviceSettingsScreen(BaseScreen):
         #Add more widgets here later
         #
 
+    def _attempt_navigation(self, target_screen):
+        if self.unsaved_changes:
+            self.target_screen = target_screen
+            self.confirm_popup = ConfirmationPopup(
+                self.app,
+                "Apply changes before leaving?",
+                on_confirm=self._confirm_and_navigate,
+                on_cancel=self._discard_and_navigate
+            )
+        else:
+            self.app.change_screen(target_screen)
+
     def _apply_changes(self):
         if not self.unsaved_changes:
             return
@@ -122,6 +135,14 @@ class DeviceSettingsScreen(BaseScreen):
         # Reset changes flag
         self.unsaved_changes = False
 
+    def _confirm_and_navigate(self):
+        self._apply_changes()
+        self.app.change_screen(self.target_screen)
+
+    def _discard_and_navigate(self):
+        self.unsaved_changes = False
+        self.app.change_screen(self.target_screen)
+
     def handle_event(self, event):
 
         if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN): 
@@ -133,10 +154,14 @@ class DeviceSettingsScreen(BaseScreen):
 
         # Navigation buttons
         if self.home_btn.is_clicked(pos):
-            self.app.change_screen("main")
+            self._attempt_navigation("main")
+            return
+            #self.app.change_screen("main")
         
         if self.system_btn.is_clicked(pos):
-            self.app.change_screen("systemsettings")
+            self._attempt_navigation("systemsettings")
+            return
+            #self.app.change_screen("systemsettings")
 
         # Device selection on left sidebar
         for name, btn in self.device_buttons.items(): 
@@ -162,6 +187,8 @@ class DeviceSettingsScreen(BaseScreen):
             self._apply_changes()
             return
 
+        if self.confirm_popup:
+            self.confirm_popup.handle_event(event)
 
     def draw(self, surface):
         surface.fill(theme.BLACK)
@@ -191,3 +218,7 @@ class DeviceSettingsScreen(BaseScreen):
         if self.selected_device:
             for key, widget in self.device_settings_widgets:
                 widget.draw(surface)
+
+        # Apply changes confirmation popup
+        if self.confirm_popup:
+            self.confirm_popup.draw(surface)

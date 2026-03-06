@@ -52,7 +52,7 @@ class AddScreen(BaseScreen):
                                         0,                           # x
                                         self.app.height - 250,       # y
                                         self.app.width,              # width
-                                        250                          # height
+                                        325                          # height
                                         )
 
     def update(self):

@@ -20,7 +20,7 @@ class ControlPairing:
         un = node_config["user"]
         hn = node_config["hostname"]
         os_info = subprocess.run([script,un,hn],check=True,
-                                 capture_output=True,text=True)
+                                 text=True)
         node_config["operating_system"] = os_info.stdout.strip()
        #with open("device_list.json", "w") as f:
             #son.dump(data, f, indent=4)

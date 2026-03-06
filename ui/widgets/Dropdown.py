@@ -3,7 +3,8 @@ import ui.theme as theme
 import ui.utilities as utilities
 
 class DropDown:
-    def __init__(self, rect, options, default=None):
+    def __init__(self, app, rect, options, default=None):
+        self.app = app
         self.rect = rect
         self.options = options
         self.selected = default if default else options[0]
@@ -49,7 +50,7 @@ class DropDown:
         pygame.draw.rect(surface, theme.GRAY, self.rect, border_radius=10)
         pygame.draw.rect(surface, theme.WHITE, self.rect, width=2, border_radius=10)
 
-        text = self.font.render(self.selected, True, theme.White)
+        text = self.font.render(self.selected, True, theme.WHITE)
         surface.blit(text, (self.rect.x + 10, self.rect.y + 10))
 
         if self.open:
@@ -60,8 +61,8 @@ class DropDown:
                     self.rect.width,
                     self.rect.height
                 )
-                pygame.draw(surface, theme.GRAY, opt_rect)
-                pygame.draw(surface, theme.GRAY, opt_rect, width=1)
+                pygame.draw.rect(surface, theme.GRAY, opt_rect)
+                pygame.draw.rect(surface, theme.GRAY, opt_rect, width=1)
 
                 t = self.font.render(opt, True, theme.WHITE) 
                 surface.blit(t, (opt_rect.x + 10, opt_rect.y + 10))

@@ -10,7 +10,7 @@ import pygame
 import json
 import sys
 from ui.screens.MainScreen import MainScreen
-from ui.screens.SettingsScreen import SettingsScreen
+from ui.screens.SystemSettingsScreen import SystemSettingsScreen
 from ui.screens.DeviceSettingsScreen import DeviceSettingsScreen
 
 # initialize pygame
@@ -56,7 +56,7 @@ class DisplayUI:
         # Register screens
         self.screens = {
             "main": MainScreen(self),
-            "settings": SettingsScreen (self),
+            "systemsettings": SystemSettingsScreen (self),
             "devicesettings": DeviceSettingsScreen(self)
         }
 

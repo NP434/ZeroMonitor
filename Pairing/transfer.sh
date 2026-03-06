@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -ex
 
 ### Master Script for initialization ###
 ### Ver 1.0 ###

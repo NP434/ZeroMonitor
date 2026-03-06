@@ -64,7 +64,7 @@ class AddScreen(BaseScreen):
     def handle_event(self,event):
         self._events.append(event)
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
             pos = event.pos
 
             if self.back_button.is_clicked(pos):

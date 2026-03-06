@@ -1,5 +1,7 @@
 import datetime
 import pygame
+import json
+import os
 from ui.screens.BaseScreen import BaseScreen
 from ui.widgets.Button import Button
 from ui.widgets.SidebarPanel import SidebarPanel
@@ -7,10 +9,32 @@ from ui.widgets.ConfirmationPopup import ConfirmationPopup
 from ui.widgets.SettingsPopup import SettingsPopup
 import ui.theme as theme
 
+
 class MainScreen(BaseScreen):
     """
     Dashboard/main screen that users will see
     """
+
+    # Friendly metric display names
+    METRIC_NAMES = {
+        "cpu_load_1m": "CPU Load (1m)",
+        "cpu_temp_c": "CPU Temperature",
+        "mem_used_percent": "Memory Usage",
+        "mem_used_mb": "Memory Used",
+        "mem_total_mb": "Memory Total",
+        "disk_used_percent": "Disk Usage"
+    }
+
+    # Metric units for display
+    METRIC_UNITS = {
+        "cpu_load_1m": "",
+        "cpu_temp_c": "°C",
+        "mem_used_percent": "%",
+        "mem_used_mb": "MB",
+        "mem_total_mb": "MB",
+        "disk_used_percent": "%"
+    }
+
     def __init__(self, app):
         super().__init__(app)
 
@@ -83,6 +107,19 @@ class MainScreen(BaseScreen):
 
         # Other initializations/state variables
         self.popup = None
+        self.cache_data = {}
+        self._load_cache_data()
+
+    def _load_cache_data(self):
+        """Load cache data from cache_data.json"""
+        cache_filepath = "data/cache_data.json"
+        if os.path.exists(cache_filepath):
+            try:
+                with open(cache_filepath, 'r') as f:
+                    self.cache_data = json.load(f)
+            except Exception as e:
+                print(f"Error loading cache_data.json: {e}")
+                self.cache_data = {}
 
 
     def handle_event(self, event):
@@ -155,9 +192,16 @@ class MainScreen(BaseScreen):
 
     def update(self):
         self.sidebar.update()
+        # Reload cache data every frame to get latest metrics
+        self._load_cache_data()
 
     def draw(self, surface):
         surface.fill(theme.BLACK)
+
+        # Draw top bar background
+        top_bar_height = 90
+        pygame.draw.rect(surface, theme.DARK_GRAY, (0, 0, self.app.width, top_bar_height))
+        pygame.draw.line(surface, theme.BLUE, (0, top_bar_height), (self.app.width, top_bar_height), 2)
 
         # --- Top Bar Elements ---
 
@@ -167,14 +211,12 @@ class MainScreen(BaseScreen):
         else:
             now = datetime.datetime.now().strftime("%I:%M %p")
 
-        time_text = theme.DEFAULT_FONT.render(now, True, theme.WHITE)
-        surface.blit(time_text, (20, 20))
+        time_text = theme.FONT_MEDIUM.render(now, True, theme.BRIGHT_BLUE)
+        surface.blit(time_text, (30, 25))
 
         # Title Centered Horizontally
-        title_text = theme.DEFAULT_FONT.render("Zero Monitor Dashboard", True, theme.WHITE)
-        title_rect = title_text.get_rect(
-            center=(self.app.width // 2, 50)
-        )
+        title_text = pygame.font.SysFont("Arial", 40, bold=True).render("⚡ Zero Monitor", True, theme.BRIGHT_BLUE)
+        title_rect = title_text.get_rect(center=(self.app.width // 2, 45))
         surface.blit(title_text, title_rect)
 
         # Draw Settings Button
@@ -185,9 +227,77 @@ class MainScreen(BaseScreen):
 
         # Draw selected device name
         if self.selected_device:
-            name_text = theme.DEFAULT_FONT.render(f"{self.selected_device["name"]} Stats", True, theme.WHITE)
-            name_rect = name_text.get_rect(center=(self.app.width // 2, 100))
+            sidebar_width = self.sidebar.current_width
+            content_area_width = self.app.width - sidebar_width
+            content_start_x = sidebar_width + 50
+            content_center_x = sidebar_width + content_area_width // 2
+
+            # Device title
+            title_font = pygame.font.SysFont("Arial", 36, bold=True)
+            name_text = title_font.render(f"{self.selected_device['name']}", True, theme.BLUE)
+            name_rect = name_text.get_rect(center=(content_center_x, 130))
             surface.blit(name_text, name_rect)
+
+            # Horizontal line separator
+            pygame.draw.line(surface, theme.GRAY, (content_start_x, 160), (self.app.width - 30, 160), 2)
+
+            # Get device data from cache
+            device_name = self.selected_device["name"]
+            device_data = self.cache_data.get(device_name, {})
+            metrics = device_data.get("metrics", {})
+            severities = device_data.get("severities", {})
+            timestamp = device_data.get("timestamp", "N/A")
+
+            # Display timestamp in smaller font
+            timestamp_parts = timestamp.split("T")
+            timestamp_display = f"Updated: {timestamp_parts[0]} {timestamp_parts[1].split('.')[0]}" if "T" in timestamp else f"Updated: {timestamp}"
+            timestamp_text = theme.FONT_SMALL.render(timestamp_display, True, theme.GRAY)
+            surface.blit(timestamp_text, (content_start_x, 175))
+
+            # Display metrics in single column for better clarity
+            metric_y = 220
+            metric_spacing = 75
+            content_area_width = self.app.width - sidebar_width - 80
+
+            metrics_list = list(metrics.items())
+
+            for metric_name, metric_value in metrics_list:
+                severity = severities.get(metric_name, "normal")
+                severity_color = theme.STATUS_COLORS.get(severity, theme.WHITE)
+
+                # Get friendly metric name and unit
+                friendly_name = self.METRIC_NAMES.get(metric_name, metric_name.replace("_", " ").title())
+                unit = self.METRIC_UNITS.get(metric_name, "")
+
+                # Format metric display
+                if isinstance(metric_value, float):
+                    display_value = f"{metric_value:.2f}"
+                else:
+                    display_value = str(metric_value)
+
+                # Draw metric background box
+                metric_box_width = content_area_width - 40
+                metric_box_height = 60
+                metric_box = pygame.Rect(content_start_x - 15, metric_y - 15, metric_box_width, metric_box_height)
+
+                # Draw background
+                pygame.draw.rect(surface, (20, 20, 20), metric_box, border_radius=12)
+                # Draw colored border
+                pygame.draw.rect(surface, severity_color, metric_box, 3, border_radius=12)
+
+                # Draw metric label (left side)
+                label_font = pygame.font.SysFont("Arial", 22)
+                label_text = label_font.render(friendly_name, True, theme.WHITE)
+                surface.blit(label_text, (content_start_x + 10, metric_y - 8))
+
+                # Draw metric value with unit (right side)
+                value_with_unit = f"{display_value}{unit}"
+                value_font = pygame.font.SysFont("Arial", 34, bold=True)
+                value_text = value_font.render(value_with_unit, True, severity_color)
+                value_rect = value_text.get_rect(right=content_start_x + metric_box_width - 30, centery=metric_y + 8)
+                surface.blit(value_text, value_rect)
+
+                metric_y += metric_spacing
 
         # Draw stat buttons centered
         if self.selected_device:
@@ -195,8 +305,10 @@ class MainScreen(BaseScreen):
             for btn in self.stat_buttons.values():
                 btn.draw(surface)
         else:
-            placeholder = theme.DEFAULT_FONT.render("Select a device to view stats", True, theme.WHITE)
-            surface.blit(placeholder, (self.app.width // 2 - placeholder.get_width() // 200, 200))
+            placeholder_font = pygame.font.SysFont("Arial", 32)
+            placeholder = placeholder_font.render("Select a device to view stats", True, theme.LIGHT_GRAY)
+            placeholder_rect = placeholder.get_rect(center=(self.app.width // 2, self.app.height // 2))
+            surface.blit(placeholder, placeholder_rect)
 
         # --- Side Bar Elements ---
 

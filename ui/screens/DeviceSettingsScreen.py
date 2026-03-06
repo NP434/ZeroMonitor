@@ -25,6 +25,7 @@ class DeviceSettingsScreen(BaseScreen):
         self.selected_device = None
         self.device_buttons = {}
         self.device_settings_widgets = []
+        self.unsaved_changes = False
 
         self.home_btn = Button(
             pygame.Rect(self.sidebar_width + 10, 20, 50, 50),
@@ -38,6 +39,13 @@ class DeviceSettingsScreen(BaseScreen):
             image=settings_icon,
             bg_color=theme.PURPLE,
             border_radius=20
+        )
+
+        self.apply_btn = Button(
+            pygame.Rect(10, self.app.height - 50, self.sidebar_width - 20, 40),
+            text="Apply Changes",
+            bg_color=theme.GREEN,
+            border_radius=10
         )
 
         self._build_device_list()
@@ -100,6 +108,20 @@ class DeviceSettingsScreen(BaseScreen):
         #Add more widgets here later
         #
 
+    def _apply_changes(self):
+        if not self.unsaved_changes:
+            return
+
+        updated_config = {}
+        for key, widget in self.device_settings_widgets:
+            updated_config[key] = widget.selected
+
+        # Publish event
+        self.app.ui_control.bus.publish("CONFIG_UPDATE", updated_config)
+
+        # Reset changes flag
+        self.unsaved_changes = False
+
     def handle_event(self, event):
 
         if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN): 
@@ -131,8 +153,14 @@ class DeviceSettingsScreen(BaseScreen):
                 if result is not None:
                     device = self._get_device(self.selected_device)
                     device[key] = result
+                    self.unsaved_changes = True
 
                     # Publish events here
+
+        # Apply Button
+        if self.apply_btn.is_clicked(pos):
+            self._apply_changes()
+            return
 
 
     def draw(self, surface):
@@ -145,6 +173,9 @@ class DeviceSettingsScreen(BaseScreen):
         # Navigation buttons
         self.home_btn.draw(surface)
         self.system_btn.draw(surface)
+
+        # Apply button
+        self.apply_btn.draw(surface)
 
         # Device buttons
         for name, btn in self.device_buttons.items():

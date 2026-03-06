@@ -4,6 +4,7 @@
 cd "$(dirname "$0")"
 
 #Look at latest data
+git stash push
 git fetch origin secret_management
 
 #Check if update needed

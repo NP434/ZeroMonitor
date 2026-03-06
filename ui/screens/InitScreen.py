@@ -3,13 +3,29 @@ from ui.widgets.Button import Button
 from ui.screens.BaseScreen import BaseScreen
 import ui.theme as theme
 import ui.utilities as utilities
+import os
 
 class InitScreen(BaseScreen):
     def __init__(self, app):
         super().__init__(app) 
 
+        # Ensure the volatile RAM vault exists
+        self.ram_dir = "/run/zero_monitor_decrypted"
+        if not os.path.exists(self.ram_dir):
+            try:
+                os.makedirs(self.ram_dir, exist_ok=True)
+                print(f"[SYSTEM] Created RAM Vault: {self.ram_dir}")
+            except Exception as e:
+                print(f"[ERROR] Could not create RAM Vault: {e}")
+
+        # Check for boot mode
+        secrets_path = "../zero_monitor_secrets/id_ed25519.enc"
+        self.is_first_boot = not os.path.exists(secrets_path)
+
         # Store User Entered Passcode
         self.passcode = ""
+        self.first_entry = ""
+        self.is_confirming = False
 
         # Keypad Grid
         self.buttons = []
@@ -63,21 +79,61 @@ class InitScreen(BaseScreen):
         # Check every button in list
         for btn in self.buttons:
             if btn.is_clicked(pos):
-                # Add the number to the passcode
                 if len(self.passcode) < 8:
                     self.passcode += btn.text
-                    print(f"Entry: {self.passcode}")
                 
-                # Max digit logic
                 if len(self.passcode) == 8:
-                    print(f"Entered 8 Digits: {self.passcode}")
-                    #self.app.change_screen("main")
+                    if self.is_first_boot:
+                        self._handle_first_boot_logic()
+                    else:
+                        self._handle_standard_unlock()
+        
+    def _handle_first_boot_logic(self):
+        if not self.is_confirming:
+            # Confirm Passcode
+            self.first_entry = self.passcode
+            self.passcode = ""
+            self.is_confirming = True
+            print("[UI] First entry received. Awaiting confirmation.")
+        else:
+            # Check if matches
+            if self.passcode == self.first_entry:
+                self._execute_script("./make_secrets.sh")
+            else:
+                # Mismatch! Reset and try again
+                print("[ERROR] Passcodes do not match. Restarting setup.")
+                self.passcode = ""
+                self.first_entry = ""
+                self.is_confirming = False
+
+    def _handle_standard_unlock(self):
+        self._execute_script("./startup_script.sh")
+
+    def _execute_script(self, script_path):
+        # Saves Password and launches .sh File
+        secure_path = os.path.join(self.ram_dir, "zero_pass.txt")
+        with open(secure_path, "w") as f:
+            f.write(self.passcode)
+        
+        import subprocess
+        subprocess.Popen(["/bin/bash", script_path])
+        
+        self.passcode = ""
+        self.app.change_screen("main")
 
     def draw(self, surface):
         surface.fill(theme.BLACK) 
 
+        # Title Logic
+        if not self.is_first_boot:
+            prompt_text = "Enter Passcode"
+        elif self.is_confirming:
+            prompt_text = "Confirm New Passcode"
+        else:
+            prompt_text = "Create New Passcode"
+
         # Draw Title
-        title = theme.DEFAULT_FONT.render("Enter Passcode", True, theme.WHITE)
+        title = theme.DEFAULT_FONT.render(prompt_text, True, theme.WHITE)
         surface.blit(title, (self.app.width // 2 - title.get_width() // 2, 60))
 
         # Draw Passcode Dots (iphone style)

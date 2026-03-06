@@ -31,14 +31,14 @@ class DeviceSettingsScreen(BaseScreen):
         self.home_btn = Button(
             pygame.Rect(self.sidebar_width + 10, 20, 50, 50),
             image=house_icon,
-            bg_color=theme.YELLOW,
+            bg_color=theme.BLUE,
             border_radius=20
         )
 
         self.system_btn = Button(
             pygame.Rect(self.sidebar_width + 70, 20, 50, 50),
             image=settings_icon,
-            bg_color=theme.PURPLE,
+            bg_color=theme.YELLOW,
             border_radius=20
         )
 

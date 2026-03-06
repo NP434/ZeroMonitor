@@ -122,12 +122,27 @@ class DeviceSettingsScreen(BaseScreen):
             self.app.change_screen(target_screen)
 
     def _apply_changes(self):
-        if not self.unsaved_changes:
+        if not self.unsaved_changes or not self.selected_device:
             return
 
-        updated_config = {}
+        device = self._get_device(self.selected_device)
+
+        POLLING_MAP = {
+            "Low": 30,
+            "Medium": 15,
+            "High": 5
+        }
+
         for key, widget in self.device_settings_widgets:
-            updated_config[key] = widget.selected
+            if key == "poll_rate":
+                label = widget.selected
+                numeric_rate = POLLING_MAP.get(label, 15)
+
+                # Publish rate change event
+                self.app.ui_control.change_polling_rate(
+                    device["name"],
+                    numeric_rate
+                )
 
         # Publish event
         self.app.ui_control.bus.publish("CONFIG_UPDATE", updated_config)
@@ -217,6 +232,17 @@ class DeviceSettingsScreen(BaseScreen):
         # Right side settings panel
         if self.selected_device:
             for key, widget in self.device_settings_widgets:
+                # Determine label text
+                if key == "poll_rate":
+                    label_text = "Polling Frequency"
+                else:
+                    label_text = key.replace("_", " ").title()
+
+                # Draw label
+                label_surface = theme.FONT_SMALL.render(label_text, True, theme.WHITE)
+                surface.blit(label_surface, (widget.rect.x, widget.rect.y - 25))
+
+                # Draw widget
                 widget.draw(surface)
 
         # Apply changes confirmation popup

@@ -84,6 +84,7 @@ class SettingsPopup:
         utilities.dim_background(self.app, surface)
 
         # Draw box
+        
         pygame.draw.rect(surface, theme.GRAY, self.rect, border_radius=10)
         pygame.draw.rect(surface, theme.WHITE, self.rect, width=2, border_radius=10)
 

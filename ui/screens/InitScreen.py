@@ -75,6 +75,9 @@ class InitScreen(BaseScreen):
         # if pos is None, exit
         if pos is None:
             return
+        
+        if event.type not in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
+            return
 
         # Check every button in list
         for btn in self.buttons:

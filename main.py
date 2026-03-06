@@ -4,6 +4,7 @@ from event_bus import EventBus
 from driver import Driver
 from ui.display_ui import DisplayUI
 from ui.control_ui import ControlUI
+from Pairing.pairing_control import ControlPairing
 
 # Create and start a single event bus that is shared between all modules
 bus = EventBus()
@@ -15,6 +16,7 @@ driver.start()
 
 # Create the UI backend control interface (publishing control events)
 ui_control = ControlUI(bus)
+pair_control = ControlPairing(bus)
 
 # Create the Pygame UI (subscribes to backend events and renders screens)
 ui_display = DisplayUI(bus, ui_control)

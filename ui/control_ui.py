@@ -26,17 +26,10 @@ class ControlUI:
             }
         )
     
-    def add_node(self):
+    def add_node(self,node_config:dict):
         """Function to add a new target node to be polled, no input for now, just hard coded"""
         self.bus.publish(
-            "ADD_NODE",
-            {
-                "name": "nas",
-                "hostname": "192.168.1.20",
-                "user": "alec",
-                "operating_system": "linux",
-                "polling_frequency": 10
-            }
+            "ADD_NODE", node_config
         )
 
     def remove_node(self, device_name):

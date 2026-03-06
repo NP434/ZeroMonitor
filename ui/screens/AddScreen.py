@@ -59,7 +59,7 @@ class AddScreen(BaseScreen):
         if self.active_textbox and self._events:
             self.keyboard.update(self._events)
             self._events.clear()
-
+    
     
     def handle_event(self,event):
         self._events.append(event)
@@ -70,9 +70,14 @@ class AddScreen(BaseScreen):
             if self.back_button.is_clicked(pos):
                 self.app.change_screen("main")
             if self.done_button.is_clicked(pos):
-                Target_name = self.DeviceNameBox.txt
-                Username = self.UserNameBox.txt
-                HostName = self.HostNameBox.txt
+                node_config = {
+                "name":self.DeviceNameBox.txt ,
+                "hostname": self.HostNameBox.txt,
+                "user": self.UserNameBox.txt,
+                "operating_system": "OS_Unknown",
+                "polling_frequency": 10
+                }
+                self.app.ui_control.add_node(node_config)
                 
 
 
@@ -80,18 +85,21 @@ class AddScreen(BaseScreen):
                 self.DeviceNameBox.activate(True)
                 self.active_textbox = self.DeviceNameBox
                 self.keyboard.text_consumer = self.DeviceNameBox.consume
+                self.keyboard.set_text("")
                 self.keyboard.enable()
 
             elif self.UserNameBox.is_clicked(pos):
-                self.UserNameBox.activate(True)
                 self.active_textbox = self.UserNameBox
                 self.keyboard.text_consumer = self.UserNameBox.consume
+                self.UserNameBox.activate(True)
+                self.keyboard.set_text("")  
                 self.keyboard.enable()
 
             elif self.HostNameBox.is_clicked(pos):
                 self.HostNameBox.activate(True)
                 self.active_textbox = self.HostNameBox
                 self.keyboard.text_consumer = self.HostNameBox.consume
+                self.keyboard.set_text("")
                 self.keyboard.enable()
 
             elif self.keyboard_rect.collidepoint(pos) and self.active_textbox:
@@ -101,7 +109,7 @@ class AddScreen(BaseScreen):
                 if self.active_textbox:
                     self.active_textbox.activate(False)
                     self.active_textbox = None
-                self.keyboard.disable
+                self.keyboard.disable()
 
 
     def draw(self,screen):

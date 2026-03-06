@@ -27,4 +27,3 @@ chmod 600 "$RAM_DIR/device_list.json"
 #Remove Password from RAM
 unset PASSCODE
 echo "--- Secrets Decrypted ---"
-python3 "$REPO_DIR/main.py"

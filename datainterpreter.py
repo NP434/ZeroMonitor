@@ -1,39 +1,14 @@
-
 # Fake Event Bus and Metric Event classes for testing purposes. In a real implementation,
 # these would be provided by the actual event system in use and would likely have more complex structures
 # and behaviors.
 
-import time
 import json
 import os
 import smtplib
 import ssl
 from email.message import EmailMessage
 from typing import Optional
-
-
-class FakeEventBus:
-    def __init__(self):
-        self.subscribers = {}
-
-    def subscribe(self, event_type, callback):
-        self.subscribers.setdefault(event_type, []).append(callback)
-
-    def publish(self, event_type, data):
-        # Single debug print (shows event type and payload once)
-        print(f"Event Published: {event_type} → {data}")
-
-        if event_type in self.subscribers:
-            for callback in self.subscribers[event_type]:
-                callback(data)
-
-
-class FakeMetricEvent:
-    def __init__(self, node, payload):
-        self.node = node
-        self.payload = payload
-        self.timestamp = time.ctime()
-        self.success = True
+from event_bus import EventBus
 
 
 # Data Interpreter Module
@@ -56,14 +31,14 @@ class DataInterpreter:
 
     def __init__(
         self,
-        event_bus,
-        json_filepath: str = "data_output.json",
-        smtp_server: Optional[str] = None,
-        smtp_port: Optional[int] = None,
-        smtp_user: Optional[str] = None,
-        smtp_password: Optional[str] = None,
-        email_from: Optional[str] = None,
-        email_to: Optional[str] = None,
+        event_bus: EventBus,
+        json_filepath: str = "data/cache_data.json",
+        smtp_server: Optional[str] = "smtp.gmail.com",
+        smtp_port: Optional[int] = 465,
+        smtp_user: Optional[str] = "zeromonitoralerts@gmail.com",
+        smtp_password: Optional[str] = "xxdesmmolmmtdqdq",
+        email_from: Optional[str] = "zeromonitoralerts@gmail.com",
+        email_to: Optional[str] = "weeboo187@gmail.com",
     ):
         self.event_bus = event_bus
         self.thresholds = self.DEFAULT_THRESHOLDS.copy()
@@ -72,7 +47,7 @@ class DataInterpreter:
         # Tracks current alert state: {(node, metric): bool}
         self.alert_state = {}
 
-        # Persistence and email config
+        # Persistence and email config needs to be loaded from a config file.
         self.json_filepath = json_filepath
         self.smtp_server = smtp_server
         self.smtp_port = smtp_port
@@ -98,7 +73,16 @@ class DataInterpreter:
 
     # Main Entry Point
     def interpret_data(self, metric_event):
+        import logging
+        logging.info(f"[DataInterpreter] Received METRIC_EVENT for node: {metric_event.node}, success: {metric_event.success}")
+
         if not metric_event.success:
+            logging.warning(f"[DataInterpreter] Handling failed metric event for {metric_event.node}: {metric_event.payload}")
+            # Still persist the failure so we know what's happening
+            try:
+                self._write_failed_event_to_json(metric_event)
+            except Exception as e:
+                logging.error(f"[DataInterpreter] Failed to write error event: {e}")
             return
 
         interpreted = self.process_data(metric_event)
@@ -109,17 +93,18 @@ class DataInterpreter:
         # Persist interpreted metrics to JSON file (updates per-node entry)
         try:
             self._write_to_json_file(interpreted)
-        except Exception:
+        except Exception as e:
             # swallow persistence errors to not break pipeline
-            pass
+            print("JSON write error: ", e)
 
         # If any severity is 'warning', attempt to send an email alert
         try:
-            if any(s == "warning" or "critical" or "severe" for s in interpreted.get("severities", {}).values() if s is not None):
+            if any(s in ["warning", "critical", "severe"] for s in interpreted.get("severities", {}).values()
+                   if s is not None):
                 self._send_warning_email(interpreted)
-        except Exception:
+        except Exception as e:
             # swallow email errors
-            pass
+            print("Email error: ", e)
 
         # Publish interpreted metrics (now always includes a 'severities' map)
         self.event_bus.publish("data_interpreted", interpreted)
@@ -219,47 +204,92 @@ class DataInterpreter:
         # Store the interpreted dict (safe types) under node key
         data[node] = interpreted
 
+        # Write back atomically using temp file
+        tmp_path = f"{filepath}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, sort_keys=True)
+        os.replace(tmp_path, filepath)
+
+        import logging
+        logging.info(f"[DataInterpreter] Updated cache_data.json for node '{node}' at {interpreted.get('timestamp')}")
+
+    def _write_failed_event_to_json(self, metric_event):
+        """Write failed metric events to cache for debugging"""
+        data = {}
+        filepath = self.json_filepath
+
+        # Ensure directory exists
+        dirpath = os.path.dirname(filepath)
+        if dirpath and not os.path.exists(dirpath):
+            os.makedirs(dirpath, exist_ok=True)
+
+        # Load existing
+        if os.path.exists(filepath):
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+
+        node = metric_event.node
+        if node is None:
+            return
+
+        # Store the error event
+        data[node] = {
+            "node": node,
+            "timestamp": metric_event.timestamp,
+            "error": metric_event.payload.get("error", "Unknown error"),
+            "success": False
+        }
+
         # Write back atomically
         tmp_path = f"{filepath}.tmp"
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, sort_keys=True)
         os.replace(tmp_path, filepath)
 
-    # Email Logic (need to find where to acquire the user's email address for the "to" field,
-    # maybe in device_list.json or a separate config file? For now it's just env vars)
-    '''
+        import logging
+        logging.info(f"[DataInterpreter] Updated cache_data.json with error for node '{node}'")
+
     # Email sending for warnings (no-op if SMTP not configured)
     def _send_warning_email(self, interpreted):
         if not (self.smtp_server and self.smtp_port and self.email_from and self.email_to):
             # SMTP not configured: skip sending
             return
 
-        subject = f"Warning: metrics for {interpreted.get('node')}"
-        body = json.dumps(interpreted, indent=2, sort_keys=True)
+        try:
+            import logging
+            logging.info(f"[DataInterpreter] Attempting to send warning email for {interpreted.get('node')}")
+            subject = f"Warning: metrics for {interpreted.get('node')}"
+            body = json.dumps(interpreted, indent=2, sort_keys=True)
 
-        msg = EmailMessage()
-        msg["From"] = self.email_from
-        msg["To"] = self.email_to
-        msg["Subject"] = subject
-        msg.set_content(body)
+            msg = EmailMessage()
+            msg["From"] = self.email_from
+            msg["To"] = self.email_to
+            msg["Subject"] = subject
+            msg.set_content(body)
 
+            # Email sending with SSL/TLS if port is 465, otherwise starttls. Login if credentials provided.
+            # Choose connection method
+            context = ssl.create_default_context()
+            if self.smtp_port == 465:
+                with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, context=context) as server:
+                    if self.smtp_user and self.smtp_password:
+                        server.login(self.smtp_user, self.smtp_password)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                    server.starttls(context=context)
+                    if self.smtp_user and self.smtp_password:
+                        server.login(self.smtp_user, self.smtp_password)
+                    server.send_message(msg)
 
-        # Email sending with SSL/TLS if port is 465, otherwise starttls. Login if credentials provided.
-        
-        # Choose connection method
-        context = ssl.create_default_context()
-        if self.smtp_port == 465:
-            with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, context=context) as server:
-                if self.smtp_user and self.smtp_password:
-                    server.login(self.smtp_user, self.smtp_password)
-                server.send_message(msg)
-        else:
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls(context=context)
-                if self.smtp_user and self.smtp_password:
-                    server.login(self.smtp_user, self.smtp_password)
-                server.send_message(msg)
-    '''
+            import logging
+            logging.info(f"[DataInterpreter] Warning email sent successfully")
+        except Exception as e:
+            import logging
+            logging.error(f"[DataInterpreter] Failed to send warning email: {e}")
 
     # Alert Evaluation
     def check_thresholds(self, interpreted):
@@ -320,29 +350,3 @@ class DataInterpreter:
             return "critical"
         else:
             return "severe"
-
-
-event = FakeEventBus()
-interpreter = DataInterpreter(event)
-
-event.publish("METRIC_EVENT", FakeMetricEvent(
-    node="server-1",
-    payload={
-        "cpu_load_1m": 0.85,
-        "mem_used_mb": 4000,
-        "mem_total_mb": 8000,
-        "disk_used_percent": 50.0,
-        "cpu_temp_c": 60.0
-    }
-))
-
-event.publish("METRIC_EVENT", FakeMetricEvent(
-    node="server-2",
-    payload={
-        "cpu_load_1m": 0.6,   # below threshold AND hysteresis
-        "cpu_temp_c": 70,
-        "mem_used_mb": 3000,
-        "mem_total_mb": 8000,
-        "disk_used_percent": 60,
-    }
-))

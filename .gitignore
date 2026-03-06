@@ -48,3 +48,4 @@ Thumbs.db
 # Pygame / runtime caches
 *.log
 *.tmp
+data_output.json

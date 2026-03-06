@@ -24,42 +24,24 @@ class Textbox:
         print("current text: %s" % text)
         self.txt = text
     
-    def activate(self, keyboard):
-        keyboard.set_consumer(self.consume)
-        self.active = True
+    def activate(self, active):
+        self.active = active
+        self.color = self.color_active if active else self.color_inactive
     
-    def handle_event(self, event):
-        # Handles user clicking into text box, and activates virtual keyboard
-        if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
-            # determine position
-            if event.type == pygame.FINGERDOWN:
-                # Finger coordinates are normalized (0.0 - 1.0)
-                pos = (
-                    int(event.x * self.app.width),
-                    int(event.y * self.app.height)
-                )
-            else:
-                # Mouse event provides pixel coordinates
-                pos = event.pos
-
-            if self.is_clicked(pos):
-                self.active = True
-                self.color = self.color_active
-            else:
-                self.active = False
-                self.color = self.color_inactive
+    def handle_event(self, pos):
+        if self.is_clicked(pos):
+            self.active = True
+            self.color = self.color_active
+        else:
+            self.active = False
+            self.color = self.color_inactive
 
 
-    
     def draw(self, surface):
         pygame.draw.rect(surface, self.color, self.rect)
 
-        txt_surf = self.font.render(self.txt,True,color="white")
+        txt_surf = self.font.render(self.txt,True,(255,255,255))
         surface.blit(txt_surf, (self.rect.x+5, self.rect.y+5))
-
-
-
-
 
 
         

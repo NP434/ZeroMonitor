@@ -74,13 +74,13 @@ class MainScreen(BaseScreen):
         #Create Add Devic Button
         add_width = 50
         add_height = 50
-        add_x = self.sidebar.x + (self,self.sidebar.width_expanded - add_width) // 2
+        add_x = self.sidebar.x + (self.sidebar.width_expanded - add_width) // 2
         add_y = self.app.height - add_height - 70
         self.add_button = Button(
             rect=(add_x,add_y,add_width,add_height),
             text="+",
             image = None,
-            bg_color=theme.Green
+            bg_color=theme.GREEN
         )
         self.add_mode = False
 

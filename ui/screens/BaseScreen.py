@@ -11,20 +11,32 @@ class BaseScreen:
 
     def load_assets(self):
         """
-        Loads all PNG assets for this screen into self.assets.
-        Folder is based on screen class name
+        Loads PNG assets into self.assets.
+        Global assets are in /assets
+        Screen-specific assets are in /assets/<screen>
         """
-        screen_name = self.__class__.__name__.replace("Screen", "").lower()
-        folder = os.path.join("assets", screen_name)
+        self.assets = {}
 
-        if not os.path.isdir(folder):
-            return
-        
-        for filename in os.listdir(folder):
-            if filename.lower().endswith(".png"):
-                path = os.path.join(folder, filename)
-                image = pygame.image.load(path).convert_alpha()
-                self.assets[filename] = image
+        screen_name = self.__class__.__name__.replace("Screen", "").lower()
+        screen_folder = os.path.join("assets", screen_name)
+
+        # Load global assets first
+        if os.path.isdir("assets"):
+            for filename in os.listdir("assets"):
+                path = os.path.join("assets", filename)
+
+                if os.path.isfile(path) and filename.lower().endswith(".png"):
+                    image = pygame.image.load(path).convert_alpha()
+                    self.assets[filename] = image
+
+        # Load screen-specific assets (override global if same name)
+        if os.path.isdir(screen_folder):
+            for filename in os.listdir(screen_folder):
+                path = os.path.join(screen_folder, filename)
+
+                if os.path.isfile(path) and filename.lower().endswith(".png"):
+                    image = pygame.image.load(path).convert_alpha()
+                    self.assets[filename] = image
 
     def handle_event(self, event):
         """

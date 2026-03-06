@@ -65,7 +65,13 @@ class AddScreen(BaseScreen):
         self._events.append(event)
 
         if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
-            pos = event.pos
+            if event.type == pygame.FINGERDOWN:
+                pos = (
+                    int(event.x * self.app.width),
+                    int(event.y * self.app.height)
+                )
+            else: 
+                pos = event.pos
 
             if self.back_button.is_clicked(pos):
                 self.app.change_screen("main")

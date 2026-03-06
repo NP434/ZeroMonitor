@@ -97,11 +97,13 @@ class DeviceSettingsScreen(BaseScreen):
         spacing = 70
 
         # Build Polling dropdown for each device
+        poll_seconds = int(device.get("polling_frequency", 15))
+        default_polling_label = self._polling_label_from_seconds(poll_seconds)
         poll_dropdown = DropDown(
             self.app,
             pygame.Rect(start_x, start_y, 200, 40),
             ["Low", "Medium", "High", "Custom"],
-            default=device.get("poll_rate", "Medium")
+            default=default_polling_label
         )
 
         self.device_settings_widgets.append(("poll_rate", poll_dropdown))
@@ -120,6 +122,14 @@ class DeviceSettingsScreen(BaseScreen):
             )
         else:
             self.app.change_screen(target_screen)
+
+    def _polling_label_from_seconds(self, seconds):
+        if seconds >= 25:
+            return "Low"
+        elif seconds >= 10:
+            return "Medium"
+        else:
+            return "High"
 
     def _apply_changes(self):
         if not self.unsaved_changes or not self.selected_device:
@@ -144,9 +154,6 @@ class DeviceSettingsScreen(BaseScreen):
                     numeric_rate
                 )
 
-        # Publish event
-        self.app.ui_control.bus.publish("CONFIG_UPDATE", updated_config)
-
         # Reset changes flag
         self.unsaved_changes = False
 
@@ -156,6 +163,10 @@ class DeviceSettingsScreen(BaseScreen):
 
     def _discard_and_navigate(self):
         self.unsaved_changes = False
+
+        if self.selected_device:
+            self._build_settings_widgets()
+            
         self.app.change_screen(self.target_screen)
 
     def handle_event(self, event):

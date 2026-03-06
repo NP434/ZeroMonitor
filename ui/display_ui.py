@@ -12,6 +12,7 @@ import sys
 from ui.screens.MainScreen import MainScreen
 from ui.screens.SystemSettingsScreen import SystemSettingsScreen
 from ui.screens.DeviceSettingsScreen import DeviceSettingsScreen
+from ui.screens.InitScreen import InitScreen
 
 # initialize pygame
 pygame.init()
@@ -57,11 +58,12 @@ class DisplayUI:
         self.screens = {
             "main": MainScreen(self),
             "systemsettings": SystemSettingsScreen (self),
-            "devicesettings": DeviceSettingsScreen(self)
+            "devicesettings": DeviceSettingsScreen(self),
+            "init": InitScreen(self)
         }
 
         # Starting on the main screen
-        self.current_screen = self.screens["main"]
+        self.current_screen = self.screens["init"]
         self._running = False
 
 

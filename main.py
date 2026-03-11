@@ -6,9 +6,28 @@ from datainterpreter import DataInterpreter
 from ui.display_ui import DisplayUI
 from ui.control_ui import ControlUI
 
+import argparse
+from paths import Config
+
+# Creates dev_mode tag
+parser = argparse.ArgumentParser(description="Zero Monitor System")
+parser.add_argument("--dev", action="store_true", help="Run in local Dev Mode")
+args = parser.parse_args()
+
+# Initialize the paths based on the tag
+config = Config(dev_mode=args.dev)
+
 # Create and start a single event bus that is shared between all modules
 bus = EventBus()
 bus.start()
+
+# PASS CONFIG TO EVERY FILE
+driver = Driver(bus, config=config)
+driver.start()
+data_interpreter = DataInterpreter(bus, config=config)
+# etc....
+# EVERY CLASS must update __init__ for config
+# self.config = config # Store the master paths
 
 # Create and start an instance of driver, passing it the shared event bus
 driver = Driver(bus)

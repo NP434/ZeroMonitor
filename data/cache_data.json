@@ -1,0 +1,20 @@
+{
+  "AlecsPC": {
+    "error": "SSH connection to AlecsPC failed after 5 retries",
+    "node": "AlecsPC",
+    "success": false,
+    "timestamp": "2026-03-06T12:13:37.760047"
+  },
+  "AlecsPi5": {
+    "error": "SSH connection to AlecsPi5 failed after 5 retries",
+    "node": "AlecsPi5",
+    "success": false,
+    "timestamp": "2026-03-06T12:13:37.747859"
+  },
+  "Pihole": {
+    "error": "SSH connection to Pihole failed after 5 retries",
+    "node": "Pihole",
+    "success": false,
+    "timestamp": "2026-03-06T12:13:37.758777"
+  }
+}

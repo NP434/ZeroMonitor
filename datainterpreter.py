@@ -19,6 +19,11 @@ class DataInterpreter:
         "mem_used_percent": 85.0,
         "disk_used_percent": 90.0,
         "cpu_temp_c": 80.0,
+        "core_voltage_v": 1.30,
+        "cpu_clock_mhz": 2200.0,
+        "uptime_seconds": 1209600.0,
+        "net_rx_kbps": 50000.0,
+        "net_tx_kbps": 50000.0,
     }
 
     # Optional hysteresis margins (how far below threshold to clear alert)
@@ -27,6 +32,11 @@ class DataInterpreter:
         "mem_used_percent": 5.0,
         "disk_used_percent": 5.0,
         "cpu_temp_c": 5.0,
+        "core_voltage_v": 0.05,
+        "cpu_clock_mhz": 100.0,
+        "uptime_seconds": 3600.0,
+        "net_rx_kbps": 5000.0,
+        "net_tx_kbps": 5000.0,
     }
 
     def __init__(
@@ -146,6 +156,11 @@ class DataInterpreter:
                 "disk_used_percent": payload.get("disk_used_percent"),
                 "mem_used_mb": payload.get("mem_used_mb"),
                 "mem_total_mb": payload.get("mem_total_mb"),
+                "core_voltage_v": payload.get("core_voltage_v"),
+                "cpu_clock_mhz": payload.get("cpu_clock_mhz"),
+                "uptime_seconds": payload.get("uptime_seconds"),
+                "net_rx_kbps": payload.get("net_rx_kbps"),
+                "net_tx_kbps": payload.get("net_tx_kbps"),
             }
         }
 

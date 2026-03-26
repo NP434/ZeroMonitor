@@ -1,6 +1,7 @@
 import pygame
 import os
 
+
 class BaseScreen:
     """
     Abstract Base Class with methods that will be used in all screens

@@ -16,6 +16,7 @@ from ui.screens.DeviceSettingsScreen import DeviceSettingsScreen
 # initialize pygame
 pygame.init()
 
+
 def load_devices():
     path = "device_list.json"
     with open(path, "r", encoding='utf-8') as file:
@@ -117,6 +118,7 @@ class DisplayUI:
 
         pygame.quit()
         sys.exit()
+
 
 if __name__ == "__main__":
     DisplayUI().run()

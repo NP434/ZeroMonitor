@@ -13,12 +13,11 @@ CERT_DIR = BASE_DIR / "certs"
 KEY_FILE = BASE_DIR / "uploaded_key.pub"
 PK_FILE = BASE_DIR / "Pdata.json"
 
-# Create and store key in location
-pairing_token = token_hex(4)
-pdat = {"pairing_token": pairing_token,
-        f"Command": 'Curl -k -H "P-Key:{pairing_token}" "192.168.0.106:8443/transfer" -o retrieved_key.pub'}
-with open(PK_FILE, "w") as f:
-    json.dump(pdat,f)
+def get_pairing_token():
+    if not PK_FILE.exists():
+        return None
+    with open(PK_FILE, "r") as f:
+        return json.load(f).get("pairing_token")
 
 app = Flask(__name__)
 close = threading.Event()
@@ -43,8 +42,14 @@ def example():
         return "Storage success", 201
 
     elif request.method == "GET":
-        provided_key = request.headers.get("P-Key")
+        pairing_token = get_pairing_token()
 
+        if not pairing_token or provided_key != pairing_token:
+            abort(403, "Unauthorized")
+        provided_key = request.headers.get("P-Key")
+        print("\n Pairing Key ")
+        print(f"{pairing_token}")
+        print("-----------------")
 
         if provided_key != pairing_token:
             abort(403, "Unauthorized")
@@ -68,9 +73,6 @@ def stat():
         return {"stat": "timeout"}, 200
 
 if __name__ == "__main__":
-    print("\n Pairing Key ")
-    print(f"{pairing_token}")
-    print("-----------------")
 
     app.run(
         host="0.0.0.0",

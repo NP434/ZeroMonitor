@@ -29,7 +29,7 @@ python -u "$SERVER_APP" &
 FLASK_PID=$!
 
 ### Wait for flask to start
-sleep 2
+sleep 5
 
 ### Upload Key ###
 echo "Uploading data"

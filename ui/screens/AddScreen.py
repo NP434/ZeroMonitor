@@ -4,6 +4,7 @@ from ui.screens.BaseScreen import BaseScreen
 from ui.widgets.Button import Button
 from ui.widgets.textbox import Textbox
 import ui.theme as theme
+from ui.widgets.DisplayPopup import DisplayPopup
 
 
 class AddScreen(BaseScreen):
@@ -16,26 +17,43 @@ class AddScreen(BaseScreen):
 
         # Back button
         self.back_button = Button(
-            rect=(50, 50, 100, 60),
+            rect=(0, 0, 100, 60),
             text="Back",
             bg_color=theme.RED
         )
         self.done_button = Button(
-            rect=(app.width - 150, 50,100,60),
+            rect=(app.width - 100, 0,100,60),
             text="Done",
             bg_color=theme.GREEN
         )
-        self.DeviceNameBox = Textbox(
-            rect=(41, 200, 300, 50),
-            text="Enter Device Name"
+
+        self.Endpoint_button = Button(
+            rect = (app.width / 4, 100, 100,60),
+            text="Endpoint",
+            bg_color=theme.BLUE
         )
+        self.Password_button = Button(
+            rect = ( (3 * app.width / 4 ) , 100, 100,60),
+            text="Password Auth",
+            bg_color=theme.GRAY
+        )
+        self.mode = "Endpoint"
+
         self.UserNameBox = Textbox(
             rect=(382, 200, 300, 50),
             text="Enter User Name"
         )
         self.HostNameBox = Textbox(
-            rect=(711, 200, 300, 50),
+            rect=(41, 200, 300, 50),
             text="Enter Host Name"
+        )
+        self.DeviceNameBox = Textbox(
+            rect=(711, 200, 300, 50),
+            text="Enter Device Name"
+        )
+        self.passwordBox = Textbox(
+            rect=(711, 200, 300, 50),
+            text="Enter Device Password"
         )
         self.keyboard_layout = VKeyboardLayout(VKeyboardLayout.QWERTY)
         self.keyboard = VKeyboard(surface=app.screen,
@@ -50,10 +68,17 @@ class AddScreen(BaseScreen):
         # assuming keyboard uses bottom 250px of the screen
         self.keyboard_rect = pygame.Rect(
                                         0,                           # x
-                                        self.app.height - 250,       # y
+                                        self.app.height,       # y
                                         self.app.width,              # width
-                                        325                          # height
+                                        600                          # height
                                         )
+        self.popup = None
+        self.token_to_be_disp = False
+        self.token = None
+
+    def end_token_disp(self):
+        self.token_to_be_disp = False
+        self.token = None
 
     def update(self):
         if self.active_textbox and self._events:
@@ -81,18 +106,37 @@ class AddScreen(BaseScreen):
                 "hostname": self.HostNameBox.txt,
                 "user": self.UserNameBox.txt,
                 "operating_system": "OS_Unknown",
-                "polling_frequency": 10
+                "polling_frequency": 10,
+                "pairing_mode" : self.mode,
+                "Pword" : None
                 }
+                if self.mode == "Pass_auth":
+                    node_config["Pword"] = self.passwordBox
                 self.app.ui_control.add_node(node_config)
+            if self.Endpoint_button.is_clicked(pos):
+                self.mode = "Endpoint"
+                self.Password_button.bg_color = theme.GRAY
+                self.Endpoint_button.bg_color = theme.BLUE
+            if self.Password_button.is_clicked(pos):
+                self.mode = "Pass_auth"
+                self.Password_button.bg_color = theme.BLUE
+                self.Endpoint_button.bg_color = theme.GRAY
                 
 
 
             if self.DeviceNameBox.is_clicked(pos):
-                self.DeviceNameBox.activate(True)
-                self.active_textbox = self.DeviceNameBox
-                self.keyboard.text_consumer = self.DeviceNameBox.consume
-                self.keyboard.set_text("")
-                self.keyboard.enable()
+                if self.mode == "Endpoint":
+                    self.DeviceNameBox.activate(True)
+                    self.active_textbox = self.DeviceNameBox
+                    self.keyboard.text_consumer = self.DeviceNameBox.consume
+                    self.keyboard.set_text("")
+                    self.keyboard.enable()
+                else:
+                    self.passwordBox.activate(True)
+                    self.active_textbox = self.passwordBox
+                    self.keyboard.text_consumer = self.passwordBox.consume
+                    self.keyboard.set_text("")
+                    self.keyboard.enable()
 
             elif self.UserNameBox.is_clicked(pos):
                 self.active_textbox = self.UserNameBox
@@ -116,25 +160,43 @@ class AddScreen(BaseScreen):
                     self.active_textbox.activate(False)
                     self.active_textbox = None
                 self.keyboard.disable()
+            if self.token_to_be_disp:
+                self.popup = DisplayPopup(
+                    app=self.app,
+                    message=f"Pairing Token: {self.token}",
+                    on_confirm=self.end_token_disp
+                )
+                
 
 
     def draw(self,screen):
         if not self.screen_filled or not self.active_textbox:
-            screen.fill(theme.GRAY)
+            screen.fill(theme.BLACK)
             self.screen_filled = True
 
         title = theme.DEFAULT_FONT.render("Add Device", True, theme.WHITE)
         screen.blit(
             title,
-            (self.app.width // 2 - title.get_width() // 2, 100)
+            (self.app.width // 2 - title.get_width() // 2, 0)
         )
         self.back_button.draw(screen)
         self.done_button.draw(screen)
+        self.Endpoint_button.draw(screen)
+        self.Password_button.draw(screen)
 
-        self.DeviceNameBox.draw(screen)
-        self.UserNameBox.draw(screen)
-        self.HostNameBox.draw(screen)
-  
+        if self.mode == 'Endpoint':
+            self.DeviceNameBox.draw(screen)
+            self.UserNameBox.draw(screen)
+            self.HostNameBox.draw(screen)
+        else:
+            self.UserNameBox.draw(screen)
+            self.HostNameBox.draw(screen)
+            self.passwordBox.draw(screen)
+
+        #Draw Pairing Token Popup
+        if self.token_to_be_disp and self.popup:
+            self.popup.draw(screen)
+
         self.keyboard.draw()
 
 

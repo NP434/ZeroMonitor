@@ -41,22 +41,29 @@ class AddScreen(BaseScreen):
 
         self.UserNameBox = Textbox(
             rect=(382, 200, 300, 50),
-            text="Enter User Name"
+            text="Enter User Name",
+            title="User Name"
         )
         self.HostNameBox = Textbox(
             rect=(41, 200, 300, 50),
-            text="Enter Host Name"
+            text="Enter Host Name",
+            title="Hostname"
         )
         self.DeviceNameBox = Textbox(
             rect=(711, 200, 300, 50),
-            text="Enter Device Name"
+            text="Enter Device Name",
+            title="Device Name"
         )
         self.passwordBox = Textbox(
             rect=(711, 200, 300, 50),
-            text="Enter Device Password"
+            text="Enter Device Password",
+            title="Password"
         )
+        self.keyboard_height=600
+        self.keyboard_surface = pygame.Surface((self.app.width, self.keyboard_height))
+        self.keyboard_surface.set_colorkey((0, 0, 0))  # optional, for transparency
         self.keyboard_layout = VKeyboardLayout(VKeyboardLayout.QWERTY)
-        self.keyboard = VKeyboard(surface=app.screen,
+        self.keyboard = VKeyboard(surface=self.keyboard_surface,
                                   text_consumer=None,
                                   main_layout=self.keyboard_layout,
                                   renderer=VKeyboardRenderer.DEFAULT
@@ -66,9 +73,10 @@ class AddScreen(BaseScreen):
         self.screen_filled = False
         self.active_textbox = None
         # assuming keyboard uses bottom 250px of the screen
+        
         self.keyboard_rect = pygame.Rect(
                                         0,                           # x
-                                        self.app.height,       # y
+                                        self.app.height - 600,       # y
                                         self.app.width,              # width
                                         600                          # height
                                         )
@@ -111,7 +119,7 @@ class AddScreen(BaseScreen):
                 "Pword" : None
                 }
                 if self.mode == "Pass_auth":
-                    node_config["Pword"] = self.passwordBox
+                    node_config["Pword"] = self.passwordBox.txt
                 self.app.ui_control.add_node(node_config)
             if self.Endpoint_button.is_clicked(pos):
                 self.mode = "Endpoint"
@@ -126,12 +134,16 @@ class AddScreen(BaseScreen):
 
             if self.DeviceNameBox.is_clicked(pos):
                 if self.mode == "Endpoint":
+                    if self.active_textbox is not None:
+                        self.active_textbox.activate(False)
                     self.DeviceNameBox.activate(True)
                     self.active_textbox = self.DeviceNameBox
                     self.keyboard.text_consumer = self.DeviceNameBox.consume
                     self.keyboard.set_text("")
                     self.keyboard.enable()
                 else:
+                    if self.active_textbox is not None:
+                        self.active_textbox.activate(False)
                     self.passwordBox.activate(True)
                     self.active_textbox = self.passwordBox
                     self.keyboard.text_consumer = self.passwordBox.consume
@@ -139,6 +151,8 @@ class AddScreen(BaseScreen):
                     self.keyboard.enable()
 
             elif self.UserNameBox.is_clicked(pos):
+                if self.active_textbox is not None:
+                        self.active_textbox.activate(False)
                 self.active_textbox = self.UserNameBox
                 self.keyboard.text_consumer = self.UserNameBox.consume
                 self.UserNameBox.activate(True)
@@ -146,6 +160,8 @@ class AddScreen(BaseScreen):
                 self.keyboard.enable()
 
             elif self.HostNameBox.is_clicked(pos):
+                if self.active_textbox is not None:
+                        self.active_textbox.activate(False)
                 self.HostNameBox.activate(True)
                 self.active_textbox = self.HostNameBox
                 self.keyboard.text_consumer = self.HostNameBox.consume
@@ -170,9 +186,9 @@ class AddScreen(BaseScreen):
 
 
     def draw(self,screen):
-        if not self.screen_filled or not self.active_textbox:
-            screen.fill(theme.BLACK)
-            self.screen_filled = True
+        #if not self.screen_filled or not self.active_textbox:
+        screen.fill(theme.BLACK)
+
 
         title = theme.DEFAULT_FONT.render("Add Device", True, theme.WHITE)
         screen.blit(
@@ -197,6 +213,11 @@ class AddScreen(BaseScreen):
         if self.token_to_be_disp and self.popup:
             self.popup.draw(screen)
 
+        if self.active_textbox:
+            screen.blit(
+            self.keyboard_surface,
+            (0, self.app.height - self.keyboard_height)
+        )
         self.keyboard.draw()
 
 

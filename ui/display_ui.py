@@ -10,8 +10,7 @@ import pygame
 import json
 import sys
 from ui.screens.MainScreen import MainScreen
-from ui.screens.SystemSettingsScreen import SystemSettingsScreen
-from ui.screens.DeviceSettingsScreen import DeviceSettingsScreen
+from ui.screens.SettingsScreen import SettingsScreen
 from ui.screens.InitScreen import InitScreen
 
 # initialize pygame
@@ -42,6 +41,7 @@ class DisplayUI:
         # Event subscriptions
         self.bus.subscribe("STOP_SYSTEM", self._handle_stop_system)
         self.bus.subscribe("ACK_REMOVE_NODE", self._handle_ack_remove)
+        self.bus.subscribe("ACK_POLLING_PAUSED", self._on_ack_polling_paused)
         self.bus.subscribe("DEVICE_LIST_UPDATED", self._handle_device_list_update)
 
         # Establish screen resolution
@@ -57,13 +57,12 @@ class DisplayUI:
         # Register screens
         self.screens = {
             "main": MainScreen(self),
-            "systemsettings": SystemSettingsScreen (self),
-            "devicesettings": DeviceSettingsScreen(self),
+            "settings" : SettingsScreen(self),
             "init": InitScreen(self)
         }
 
         # Starting on the main screen
-        self.current_screen = self.screens["init"]
+        self.current_screen = self.screens["main"]
         self._running = False
 
 
@@ -94,11 +93,26 @@ class DisplayUI:
 
             self.current_screen._exit_remove_mode()
 
+    def _on_ack_polling_paused(self, payload):
+        name = payload["device"]
+        paused = payload["paused"]
+
+        # Update local device list
+        for d in self.devices:
+            if d["name"] == name:
+                d["polling_paused"] = paused
+
+        # If currently in SettingsScreen, rebuild widgets
+        if isinstance(self.current_screen, SettingsScreen):
+            self.current_screen._build_settings_widgets()
+
+
     def _handle_device_list_update(self, devices):
         print("inside _handle_device_list_update")
         self.devices = list(devices.values())
         if isinstance(self.current_screen, MainScreen):
             self.current_screen._build_device_buttons()
+
 
     def run(self):
         self._running = True

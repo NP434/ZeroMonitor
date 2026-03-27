@@ -66,6 +66,11 @@ class Driver:
             "ADD_NODE",
             self.add_node
         )
+
+        self.event_bus.subscribe(
+            "PAUSE_POLLING",
+             self._on_pause_polling
+        )
         # Will need to add many more based on which UI events need to occur
 
         # Load targets and launch polling
@@ -155,6 +160,8 @@ class Driver:
             "success": success
         })
 
+        # ACK Pause Node
+
         # reconcile system
         self.reload_config()
 
@@ -241,6 +248,26 @@ class Driver:
         with open ("device_list.json", "r") as f:
             device_list = load(f)
         self.event_bus.publish("DEVICE_LIST_UPDATED", device_list)
+
+    def _on_pause_polling(self, payload):
+        device = payload["device"]
+        paused = payload["paused"]
+
+        # Update internal node state
+        node_entry = self.polling_agent.workers.get(device)
+        if node_entry:
+            node, future = node_entry
+            node.polling_paused = paused
+            logging.info(f"Polling for {device} paused = {paused}")
+        else:
+            logging.warning(f"Pause request for unknown device: {device}")
+
+        # Send ACK back to UI
+        self.event_bus.publish("ACK_POLLING_PAUSED", {
+            "device": device,
+            "paused": paused
+        })
+
 
 
 # Load and initialize targets from device_list.json

@@ -55,6 +55,7 @@ class Node:
     stop_event: threading.Event | None = None
     # Used for exponential backoff logic
     fail_count: int = 0
+    polling_paused: bool = False
 
 # This class collects data from a Linux system and returns a SystemMetrics object
 class LinuxMetricsProvider(MetricsProvider):
@@ -347,13 +348,17 @@ def run_node(node: Node, queue: Queue):
                 if stop_event.wait(wait_time):
                     logger.info("Worker stopped during wait")
                     return
-
             # If wait time is over, try to collect metrics
             try:
+                if node.polling_paused:
+                    next_run += interval
+                    continue
+
                 metrics = node.provider.collect(
                     node.name,
                     stop_event=stop_event
                 )
+                
                 logger.info("metrics collected successfully for %s", node.name)
                 # Put metrics in the queue
                 queue.put(MetricEvent(

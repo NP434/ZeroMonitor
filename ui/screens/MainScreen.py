@@ -6,7 +6,6 @@ from ui.screens.BaseScreen import BaseScreen
 from ui.widgets.Button import Button
 from ui.widgets.SidebarPanel import SidebarPanel
 from ui.widgets.ConfirmationPopup import ConfirmationPopup
-from ui.widgets.SettingsPopup import SettingsPopup
 import ui.theme as theme
 
 
@@ -148,7 +147,7 @@ class MainScreen(BaseScreen):
 
             # Settings button clicked
             if self.settings_button.is_clicked(pos):
-                self.popup = SettingsPopup(self.app, self.settings_button.rect)
+                self.app.change_screen("settings")
                 return
             
             # Clock button clicked

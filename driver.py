@@ -23,7 +23,8 @@ logging.basicConfig(
 # Control module linking application service
 class Driver:
     """The driver owns the polling agent, and routes touchscreen control events to polling agent functions"""
-    def __init__(self, event_bus: EventBus):
+    def __init__(self, event_bus: EventBus, config):
+        self.config = config #FOR DEV MODE
         self.polling_agent = None
         self.metrics_queue = None
         self.control_executor = None
@@ -66,6 +67,11 @@ class Driver:
             "ADD_NODE",
             self.add_node
         )
+
+        self.event_bus.subscribe(
+            "PAUSE_POLLING",
+             self._on_pause_polling
+        )
         # Will need to add many more based on which UI events need to occur
 
         # Load targets and launch polling
@@ -103,6 +109,7 @@ class Driver:
     def remove_node(self, node_name: str):
         """System-level node removal"""
 
+        success = False
         logging.info("[Driver] Removing node: %s", node_name)
 
         # Stop the running worker
@@ -133,17 +140,28 @@ class Driver:
                     "[Driver] Node '%s' removed from configuration",
                     node_name
                 )
+                success = True
             else:
                 logging.warning(
                     "[Driver] Node '%s' not found in configuration",
                     node_name
                 )
+                success = False
 
         except Exception as e:
             logging.error(
                 "[Driver] Failed removing node from JSON: %s",
                 e
             )
+            success = False
+
+        # ACK Remove Node
+        self.event_bus.publish("ACK_REMOVE_NODE", {
+            "node": node_name,
+            "success": success
+        })
+
+        # ACK Pause Node
 
         # reconcile system
         self.reload_config()
@@ -228,15 +246,29 @@ class Driver:
         self.polling_agent.reconcile(nodes)
 
         # Publish device list to UI
-        device_list = []
-        for n in nodes:
-            device_list.append({
-                "name": n.name,
-                "hostname": n.provider.conn.host,
-                "operating_system": n.provider.__class__.__name__.replace("MetricsProvider", ""),
-                "polling_frequency": n.interval
-            })
+        with open ("device_list.json", "r") as f:
+            device_list = load(f)
         self.event_bus.publish("DEVICE_LIST_UPDATED", device_list)
+
+    def _on_pause_polling(self, payload):
+        device = payload["device"]
+        paused = payload["paused"]
+
+        # Update internal node state
+        node_entry = self.polling_agent.workers.get(device)
+        if node_entry:
+            node, future = node_entry
+            node.polling_paused = paused
+            logging.info(f"Polling for {device} paused = {paused}")
+        else:
+            logging.warning(f"Pause request for unknown device: {device}")
+
+        # Send ACK back to UI
+        self.event_bus.publish("ACK_POLLING_PAUSED", {
+            "device": device,
+            "paused": paused
+        })
+
 
 
 # Load and initialize targets from device_list.json

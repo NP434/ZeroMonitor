@@ -13,6 +13,7 @@ from ui.screens.MainScreen import MainScreen
 from ui.screens.SettingsScreen import SettingsScreen
 from ui.screens.AddScreen import AddScreen
 
+from ui.screens.InitScreen import InitScreen
 
 # initialize pygame
 pygame.init()
@@ -25,7 +26,7 @@ def load_devices():
     
 
 class DisplayUI:
-    def __init__(self, bus=None, ui_control=None):
+    def __init__(self, config, bus=None, ui_control=None):
         # Initialize an EventBus
         if bus is None:
             from event_bus import EventBus
@@ -39,8 +40,13 @@ class DisplayUI:
             ui_control = ControlUI(self.bus)
         self.ui_control = ui_control
 
+        # For DEV MODE and Pathing
+        self.config = config 
+
         # Event subscriptions
         self.bus.subscribe("STOP_SYSTEM", self._handle_stop_system)
+        self.bus.subscribe("ACK_REMOVE_NODE", self._handle_ack_remove)
+        self.bus.subscribe("ACK_POLLING_PAUSED", self._on_ack_polling_paused)
         self.bus.subscribe("DEVICE_LIST_UPDATED", self._handle_device_list_update)
         self.bus.subscribe("Display_token",self._handle_token_display)
 
@@ -59,10 +65,12 @@ class DisplayUI:
             "main": MainScreen(self),
             "settings": SettingsScreen (self),
             "add_device": AddScreen(self)
+            "settings" : SettingsScreen(self),
+            "init": InitScreen(self)
         }
 
         # Starting on the main screen
-        self.current_screen = self.screens["main"]
+        self.current_screen = self.screens["init"]
         self._running = False
 
 
@@ -77,9 +85,39 @@ class DisplayUI:
         """Backend-initiated shutdown -> Shutdown UI Loop"""
         self._running = False
 
+    def _handle_ack_remove(self, payload):
+        node = payload.get("node")
+        success = payload.get("success")
+
+        print(f"ACK_REMOVE_NODE received for {node}, success={success}")
+        
+        if isinstance(self.current_screen, MainScreen):
+            sel = self.current_screen.selected_device
+            if isinstance(sel, dict):
+                if sel.get("name") == node:
+                    self.current_screen.selected_device = None
+            elif sel == node:
+                self.current_screen.selected_device = None
+
+            self.current_screen._exit_remove_mode()
+
+    def _on_ack_polling_paused(self, payload):
+        name = payload["device"]
+        paused = payload["paused"]
+
+        # Update local device list
+        for d in self.devices:
+            if d["name"] == name:
+                d["polling_paused"] = paused
+
+        # If currently in SettingsScreen, rebuild widgets
+        if isinstance(self.current_screen, SettingsScreen):
+            self.current_screen._build_settings_widgets()
+
+
     def _handle_device_list_update(self, devices):
         print("inside _handle_device_list_update")
-        self.devices = devices
+        self.devices = list(devices.values())
         if isinstance(self.current_screen, MainScreen):
             self.current_screen._build_device_buttons()
     
@@ -87,6 +125,7 @@ class DisplayUI:
         """Handles displaying the pairing token in a popup"""
         self.screens["add_device"].token_to_be_disp = True
         self.screens["add_device"].token = token
+
 
 
 
@@ -102,7 +141,7 @@ class DisplayUI:
                 # Send events to the active screen to be handled
                 self.current_screen.handle_event(event)
             
-            # Update and draw the active screen
+            # Update and draw the active screen  
             self.current_screen.update()
             self.current_screen.draw(self.screen)
 

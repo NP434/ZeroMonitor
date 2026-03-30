@@ -2,13 +2,15 @@
 Docstring for ui.widgets.SidebarPanel
 """
 import pygame
+import ui.theme as theme
 from ui.widgets.Button import Button
 
 class SidebarPanel:
     """
     Docstring for SidebarPanel
     """
-    def __init__(self, x, y, width_expanded, width_collapsed, height, expanded=True, toggle_button=None):
+    def __init__(self, app,  x, y, width_expanded, width_collapsed, height, expanded=True, toggle_button=None):
+        self.app = app
         self.x = x
         self.y = y
         self.width_collapsed = width_collapsed
@@ -75,12 +77,23 @@ class SidebarPanel:
         # Background
         rect = pygame.Rect(self.x, self.y, self.current_width, self.height)
         pygame.draw.rect(surface, self.bg_color, rect)
+        pygame.draw.line(surface, theme.WHITE, rect.topright, rect.bottomright, 1)
 
         # Draw toggle button
         self.toggle_button.draw(surface)
 
     def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if self.toggle_button.is_clicked(event.pos):
-                self.toggle()
+        if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
+            # Determine position based on event type
+            if event.type == pygame.FINGERDOWN:
+                # Finger coordinates are normalized (0.0 - 1.0)
+                pos = (
+                    int(event.x * self.app.width),
+                    int(event.y * self.app.height)
+                )
+            else:
+                # Mouse event provides pixel coordinates
+                pos = event.pos
 
+            if self.toggle_button.is_clicked(pos):
+                self.toggle()

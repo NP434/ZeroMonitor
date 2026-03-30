@@ -7,6 +7,7 @@ class BaseScreen:
     """
     def __init__(self, app):
         self.app = app
+        self.config = app.config # Pathing Logic for screens
         self.assets = {}
 
     def load_assets(self):

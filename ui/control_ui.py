@@ -4,8 +4,9 @@ import logging
 
 class ControlUI:
     """Framework for the UI class that will drive the UI and publish events to the driver based on button presses"""
-    def __init__(self, event_bus):
+    def __init__(self, event_bus, config):
         self.bus = event_bus
+        self.config = config # For DEV MODE and Pathing
         self.logger = logging.getLogger("ui")
 
     # Currently this command is executed in main, but later, it will be executed by run_ui function in this class

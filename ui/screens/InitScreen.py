@@ -9,18 +9,11 @@ class InitScreen(BaseScreen):
     def __init__(self, app):
         super().__init__(app) 
 
-        # Ensure the volatile RAM vault exists
-        self.ram_dir = "/run/zero_monitor_decrypted"
-        if not os.path.exists(self.ram_dir):
-            try:
-                os.makedirs(self.ram_dir, exist_ok=True)
-                print(f"[SYSTEM] Created RAM Vault: {self.ram_dir}")
-            except Exception as e:
-                print(f"[ERROR] Could not create RAM Vault: {e}")
+        # Use Paths
+        self.paths = self.app.config
 
         # Check for boot mode
-        secrets_path = "../zero_monitor_secrets/id_ed25519.enc"
-        self.is_first_boot = not os.path.exists(secrets_path)
+        self.is_first_boot = not os.path.exists(self.paths.ssh_key_enc)
 
         # Store User Entered Passcode
         self.passcode = ""

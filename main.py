@@ -21,26 +21,22 @@ config = Config(dev_mode=args.dev)
 bus = EventBus()
 bus.start()
 
-# PASS CONFIG TO EVERY FILE
-driver = Driver(bus, config=config)
-driver.start()
-data_interpreter = DataInterpreter(bus, config=config)
 # etc....
 # EVERY CLASS must update __init__ for config
 # self.config = config # Store the master paths
 
 # Create and start an instance of driver, passing it the shared event bus
-driver = Driver(bus)
+driver = Driver(bus, config=config)
 driver.start()
 
 # Instantiate DataInterpreter to process metrics from the polling agent
-data_interpreter = DataInterpreter(bus)
+data_interpreter = DataInterpreter(bus, config=config)
 
 # Create the UI backend control interface (publishing control events)
-ui_control = ControlUI(bus)
+ui_control = ControlUI(bus, config=config)
 
 # Create the Pygame UI (subscribes to backend events and renders screens)
-ui_display = DisplayUI(bus, ui_control)
+ui_display = DisplayUI(config=config, bus=bus, ui_control=ui_control)
 ui_display.run()
 
 # Example commands from the UI, this will be handled by UI_Controller in the future

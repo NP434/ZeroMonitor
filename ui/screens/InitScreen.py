@@ -4,6 +4,7 @@ from ui.screens.BaseScreen import BaseScreen
 import ui.theme as theme
 import ui.utilities as utilities
 import os
+import subprocess
 
 class InitScreen(BaseScreen):
     def __init__(self, app):
@@ -106,16 +107,18 @@ class InitScreen(BaseScreen):
         self._execute_script("./startup_script.sh")
 
     def _execute_script(self, script_path):
-        # Saves Password and launches .sh File
-        secure_path = os.path.join(self.ram_dir, "zero_pass.txt")
-        with open(secure_path, "w") as f:
+        # Use the pre-defined pass_file path
+        with open(self.paths.pass_file, "w") as f:
             f.write(self.passcode)
         
-        import subprocess
-        subprocess.Popen(["/bin/bash", script_path])
+        # Build the command dynamically
+        cmd = ["/bin/bash", script_path]
         
-        self.passcode = ""
-        self.app.change_screen("main")
+        # Pass the 'Dev Tag' to the shell script if needed
+        if self.paths.dev_mode:
+            cmd.append("--dev")
+    
+        subprocess.Popen(cmd)
 
     def draw(self, surface):
         surface.fill(theme.BLACK) 

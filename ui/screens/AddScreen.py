@@ -209,9 +209,7 @@ class AddScreen(BaseScreen):
             self.HostNameBox.draw(screen)
             self.passwordBox.draw(screen)
 
-        #Draw Pairing Token Popup
-        if self.token_to_be_disp and self.popup:
-            self.popup.draw(screen)
+        
 
         if self.active_textbox:
             screen.blit(
@@ -220,5 +218,6 @@ class AddScreen(BaseScreen):
         )
         self.keyboard.draw()
 
-
-
+        #Draw Pairing Token Popup
+        if self.token_to_be_disp and self.popup:
+            self.popup.draw(screen)

@@ -13,12 +13,12 @@ class DisplayPopup:
         w = 300
         h = 150
         x = (self.app.width - w) // 2
-        y = (self.app.height - h) // 2
+        y = (self.app.height - h ) // 3
         self.rect = pygame.Rect(x, y, w, h)
 
         # Done button
         self.confirm_done = Button(
-            pygame.Rect(x + 40, y + 90, 80, 40),
+            pygame.Rect(x + 110, y + 90, 80, 40),
             text="Done",
             bg_color=theme.BLUE
         )

@@ -23,7 +23,8 @@ logging.basicConfig(
 # Control module linking application service
 class Driver:
     """The driver owns the polling agent, and routes touchscreen control events to polling agent functions"""
-    def __init__(self, event_bus: EventBus):
+    def __init__(self, event_bus: EventBus, config):
+        self.config = config #FOR DEV MODE
         self.polling_agent = None
         self.metrics_queue = None
         self.control_executor = None

@@ -11,6 +11,8 @@ import json
 import sys
 from ui.screens.MainScreen import MainScreen
 from ui.screens.SettingsScreen import SettingsScreen
+from ui.screens.AddScreen import AddScreen
+
 from ui.screens.InitScreen import InitScreen
 
 # initialize pygame
@@ -46,6 +48,7 @@ class DisplayUI:
         self.bus.subscribe("ACK_REMOVE_NODE", self._handle_ack_remove)
         self.bus.subscribe("ACK_POLLING_PAUSED", self._on_ack_polling_paused)
         self.bus.subscribe("DEVICE_LIST_UPDATED", self._handle_device_list_update)
+        self.bus.subscribe("Display_token",self._handle_token_display)
 
         # Establish screen resolution
         self.width = 1024
@@ -60,6 +63,8 @@ class DisplayUI:
         # Register screens
         self.screens = {
             "main": MainScreen(self),
+            "settings": SettingsScreen (self),
+            "add_device": AddScreen(self)
             "settings" : SettingsScreen(self),
             "init": InitScreen(self)
         }
@@ -115,6 +120,14 @@ class DisplayUI:
         self.devices = list(devices.values())
         if isinstance(self.current_screen, MainScreen):
             self.current_screen._build_device_buttons()
+    
+    def _handle_token_display(self, token):
+        """Handles displaying the pairing token in a popup"""
+        self.screens["add_device"].token_to_be_disp = True
+        self.screens["add_device"].token = token
+
+
+
 
 
     def run(self):

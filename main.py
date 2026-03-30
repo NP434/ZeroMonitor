@@ -5,6 +5,7 @@ from driver import Driver
 from datainterpreter import DataInterpreter
 from ui.display_ui import DisplayUI
 from ui.control_ui import ControlUI
+from Pairing.pairing_control import ControlPairing
 
 import argparse
 from paths import Config
@@ -33,6 +34,8 @@ driver.start()
 data_interpreter = DataInterpreter(bus, config=config)
 
 # Create the UI backend control interface (publishing control events)
+ui_control = ControlUI(bus)
+pair_control = ControlPairing(bus)
 ui_control = ControlUI(bus, config=config)
 
 # Create the Pygame UI (subscribes to backend events and renders screens)

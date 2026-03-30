@@ -34,7 +34,7 @@ driver.start()
 data_interpreter = DataInterpreter(bus, config=config)
 
 # Create the UI backend control interface (publishing control events)
-ui_control = ControlUI(bus)
+ui_control = ControlUI(bus, config=config)
 pair_control = ControlPairing(bus)
 ui_control = ControlUI(bus, config=config)
 

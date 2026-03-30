@@ -4,23 +4,17 @@ from ui.screens.BaseScreen import BaseScreen
 import ui.theme as theme
 import ui.utilities as utilities
 import os
+import subprocess
 
 class InitScreen(BaseScreen):
     def __init__(self, app):
         super().__init__(app) 
 
-        # Ensure the volatile RAM vault exists
-        self.ram_dir = "/run/zero_monitor_decrypted"
-        if not os.path.exists(self.ram_dir):
-            try:
-                os.makedirs(self.ram_dir, exist_ok=True)
-                print(f"[SYSTEM] Created RAM Vault: {self.ram_dir}")
-            except Exception as e:
-                print(f"[ERROR] Could not create RAM Vault: {e}")
+        # Use Paths
+        self.paths = self.app.config
 
         # Check for boot mode
-        secrets_path = "../zero_monitor_secrets/id_ed25519.enc"
-        self.is_first_boot = not os.path.exists(secrets_path)
+        self.is_first_boot = not os.path.exists(self.paths.ssh_key_enc)
 
         # Store User Entered Passcode
         self.passcode = ""
@@ -75,6 +69,9 @@ class InitScreen(BaseScreen):
         # if pos is None, exit
         if pos is None:
             return
+        
+        if event.type not in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
+            return
 
         # Check every button in list
         for btn in self.buttons:
@@ -110,16 +107,18 @@ class InitScreen(BaseScreen):
         self._execute_script("./startup_script.sh")
 
     def _execute_script(self, script_path):
-        # Saves Password and launches .sh File
-        secure_path = os.path.join(self.ram_dir, "zero_pass.txt")
-        with open(secure_path, "w") as f:
+        # Use the pre-defined pass_file path
+        with open(self.paths.pass_file, "w") as f:
             f.write(self.passcode)
         
-        import subprocess
-        subprocess.Popen(["/bin/bash", script_path])
+        # Build the command dynamically
+        cmd = ["/bin/bash", script_path]
         
-        self.passcode = ""
-        self.app.change_screen("main")
+        # Pass the 'Dev Tag' to the shell script if needed
+        if self.paths.dev_mode:
+            cmd.append("--dev")
+    
+        subprocess.Popen(cmd)
 
     def draw(self, surface):
         surface.fill(theme.BLACK) 

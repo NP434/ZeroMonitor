@@ -24,7 +24,7 @@ def load_devices():
     
 
 class DisplayUI:
-    def __init__(self, bus=None, ui_control=None):
+    def __init__(self, config, bus=None, ui_control=None):
         # Initialize an EventBus
         if bus is None:
             from event_bus import EventBus
@@ -37,6 +37,9 @@ class DisplayUI:
             from control_ui import ControlUI
             ui_control = ControlUI(self.bus)
         self.ui_control = ui_control
+
+        # For DEV MODE and Pathing
+        self.config = config 
 
         # Event subscriptions
         self.bus.subscribe("STOP_SYSTEM", self._handle_stop_system)

@@ -14,9 +14,9 @@ echo "--- Checking for updates from GitHub ---"
 PASSCODE=$(cat "$PASS_FILE")
 
 #Decryption Phase
-cp "$SECRETS_DIR/id_ed25519.enc" "$RAM_DIR/my_key"
-ssh-keygen -p -P "$PASSCODE" -N "$PASSCODE" -f "$RAM_DIR/my_key"
-chmod 600 "$RAM_DIR/my_key"
+cp "$SECRETS_DIR/id_ed25519.enc" "$RAM_DIR/decrypted_key"
+ssh-keygen -p -P "$PASSCODE" -N "$PASSCODE" -f "$RAM_DIR/decrypted_key"
+chmod 600 "$RAM_DIR/decrypted_key"
 
 openssl enc -d -aes-256-cbc -pbkdf2 -salt 
 	-in "$SECRETS_DIR/encrypted_device_list.enc" 

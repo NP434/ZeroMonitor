@@ -65,7 +65,7 @@ class DisplayUI:
         }
 
         # Starting on the main screen
-        self.current_screen = self.screens["main"]
+        self.current_screen = self.screens["init"]
         self._running = False
 
 

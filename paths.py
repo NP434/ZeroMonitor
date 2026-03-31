@@ -10,7 +10,7 @@ class Config:
         
         if self.dev_mode:
             # dev_mode argparse repos
-            self.secrets_dir = os.path.join(self.base_dir, "dev_vault", "secrets")
+            self.storage_dir = os.path.join(self.base_dir, "dev_vault", "storage")
             self.ram_dir = os.path.join(self.base_dir, "dev_vault", "ram")
         else:
             # Standard Raspberry Pi paths

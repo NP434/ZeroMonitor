@@ -2,17 +2,12 @@
 
 #DIR Locations
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
-SECRETS_DIR="$REPO_DIR/../zero_monitor_secrets"
+SECRETS_DIR="/home/admin/zero_monitor_storage"
 RAM_DIR="/run/zero_monitor_decrypted"
 PASS_FILE="$RAM_DIR/zero_pass.txt"
 
 echo "--- Zero Monitor: Security Initialization ---"
 
-#Create Secrets Vault
-if [ ! -d "$SECRETS_DIR" ]; then
-    mkdir -p "$SECRETS_DIR"
-    echo "Created directory: $SECRETS_DIR"
-fi
 
 #Collect Master Passkey
 PASSCODE=$(cat "$PASS_FILE")

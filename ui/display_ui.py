@@ -64,7 +64,7 @@ class DisplayUI:
         self.screens = {
             "main": MainScreen(self),
             "settings": SettingsScreen (self),
-            "add_device": AddScreen(self)
+            "add_device": AddScreen(self),
             "settings" : SettingsScreen(self),
             "init": InitScreen(self)
         }

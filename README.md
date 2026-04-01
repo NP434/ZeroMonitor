@@ -31,7 +31,7 @@ ZeroMonitor follows a **client-server model**:
 - No installed agents  
 - Expose hardware/system data through accessible interfaces  
 
-### 🔹 Backend Server  
+### 🔹 Backend
 - Collects and processes system data  
 - Normalizes and stores metrics  
 

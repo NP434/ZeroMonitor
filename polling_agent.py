@@ -19,6 +19,11 @@ class SystemMetrics:
     mem_total_mb: Optional[int]
     mem_used_mb: Optional[int]
     disk_used_percent: Optional[float]
+    core_voltage_v: Optional[float]
+    cpu_clock_mhz: Optional[float]
+    uptime_seconds: Optional[float]
+    net_rx_kbps: Optional[float]
+    net_tx_kbps: Optional[float]
 
 # This object is passed to the metrics queue and includes system metrics
 @dataclass
@@ -59,6 +64,12 @@ class Node:
 
 # This class collects data from a Linux system and returns a SystemMetrics object
 class LinuxMetricsProvider(MetricsProvider):
+    def __init__(self, conn: Connection):
+        super().__init__(conn)
+        self._prev_net_rx_bytes = None
+        self._prev_net_tx_bytes = None
+        self._prev_net_ts = None
+
     def collect(self, node_name: str, stop_event=None) -> SystemMetrics:
         """Linux specific metrics provider"""
         cmd = r"""
@@ -67,12 +78,20 @@ TEMP=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo "")
 LOAD=$(cut -d' ' -f1 /proc/loadavg)
 MEM=$(free -m | awk 'NR==2{print $2","$3}')
 DISK=$(df -h / | awk 'NR==2{print $5}')
+CLOCK=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null || awk '/cpu MHz/{print $4; exit}' /proc/cpuinfo 2>/dev/null || echo "")
+VOLT=$(vcgencmd measure_volts core 2>/dev/null | sed -E 's/.*=([0-9.]+)V/\1/' || echo "")
+UPTIME=$(cut -d' ' -f1 /proc/uptime 2>/dev/null || echo "")
+NET=$(awk -F'[: ]+' 'NR>2 && $1!="lo"{rx+=$3; tx+=$11} END{print rx","tx}' /proc/net/dev 2>/dev/null)
 
 echo "HOST=$HOST"
 echo "TEMP=$TEMP"
 echo "LOAD=$LOAD"
 echo "MEM=$MEM"
 echo "DISK=$DISK"
+echo "CLOCK=$CLOCK"
+echo "VOLT=$VOLT"
+echo "UPTIME=$UPTIME"
+echo "NET=$NET"
 """
         result = self.conn.run(
             cmd,
@@ -95,21 +114,79 @@ echo "DISK=$DISK"
         )
 
         mem_total = mem_used = None
-        if "MEM" in data and "," in data["MEM"]:    
+        if "MEM" in data and "," in data["MEM"]:
             mem_total, mem_used = map(int, data["MEM"].split(","))
+
+        cpu_clock_mhz = None
+        clock_raw = data.get("CLOCK", "")
+        if clock_raw:
+            try:
+                clock_val = float(clock_raw)
+                cpu_clock_mhz = (clock_val / 1000.0) if clock_val > 10000 else clock_val
+            except ValueError:
+                cpu_clock_mhz = None
+
+        core_voltage_v = None
+        voltage_raw = data.get("VOLT", "")
+        if voltage_raw:
+            try:
+                core_voltage_v = float(voltage_raw)
+            except ValueError:
+                core_voltage_v = None
+
+        uptime_seconds = None
+        uptime_raw = data.get("UPTIME", "")
+        if uptime_raw:
+            try:
+                uptime_seconds = float(uptime_raw)
+            except ValueError:
+                uptime_seconds = None
+
+        net_rx_kbps = None
+        net_tx_kbps = None
+        net_raw = data.get("NET", "")
+        if "," in net_raw:
+            try:
+                rx_bytes, tx_bytes = map(int, net_raw.split(",", 1))
+                now_ts = time.monotonic()
+                if (
+                    self._prev_net_ts is not None
+                    and self._prev_net_rx_bytes is not None
+                    and self._prev_net_tx_bytes is not None
+                ):
+                    dt = now_ts - self._prev_net_ts
+                    if dt > 0:
+                        rx_delta = max(0, rx_bytes - self._prev_net_rx_bytes)
+                        tx_delta = max(0, tx_bytes - self._prev_net_tx_bytes)
+                        net_rx_kbps = (rx_delta * 8.0) / dt / 1000.0
+                        net_tx_kbps = (tx_delta * 8.0) / dt / 1000.0
+
+                self._prev_net_rx_bytes = rx_bytes
+                self._prev_net_tx_bytes = tx_bytes
+                self._prev_net_ts = now_ts
+            except ValueError:
+                pass
 
         return SystemMetrics(
             hostname=data["HOST"],
-            timestamp = datetime.now().isoformat(),
+            timestamp=datetime.now().isoformat(),
             cpu_temp_c=cpu_temp,
             cpu_load_1m=float(data["LOAD"]),
             mem_total_mb=mem_total,
             mem_used_mb=mem_used,
             disk_used_percent=float(data["DISK"].replace("%", "")),
+            core_voltage_v=core_voltage_v,
+            cpu_clock_mhz=cpu_clock_mhz,
+            uptime_seconds=uptime_seconds,
+            net_rx_kbps=net_rx_kbps,
+            net_tx_kbps=net_tx_kbps,
         )
     
 # This class collects data from a Windows system and returns a SystemMetrics object
 class WindowsMetricsProvider(MetricsProvider):
+    def __init__(self, conn: Connection):
+        super().__init__(conn)
+
     def collect(self, node_name: str, stop_event=None) -> SystemMetrics:
         """Windows specific metrics provider"""
         cmd = r"""
@@ -119,11 +196,20 @@ $cpu = (Get-Counter '\Processor(_Total)\% Processor Time').CounterSamples[0].Coo
 $memTotal = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1MB
 $memFree = (Get-Counter '\Memory\Available MBytes').CounterSamples[0].CookedValue
 $disk = (Get-PSDrive C).Used / (Get-PSDrive C).Maximum * 100
+$clock = (Get-CimInstance Win32_Processor | Measure-Object -Property CurrentClockSpeed -Average).Average
+$uptimeSec = (New-TimeSpan -Start (Get-CimInstance Win32_OperatingSystem).LastBootUpTime -End (Get-Date)).TotalSeconds
+$rx = (Get-Counter '\Network Interface(*)\Bytes Received/sec').CounterSamples | Measure-Object -Property CookedValue -Sum
+$tx = (Get-Counter '\Network Interface(*)\Bytes Sent/sec').CounterSamples | Measure-Object -Property CookedValue -Sum
 
 Write-Output \"HOST=$hostn\"
 Write-Output \"CPU=$cpu\"
 Write-Output \"MEM=$memTotal,$memFree\"
 Write-Output \"DISK=$disk\"
+Write-Output \"CLOCK=$clock\"
+Write-Output \"UPTIME=$uptimeSec\"
+Write-Output \"NET_RX_BPS=$($rx.Sum)\"
+Write-Output \"NET_TX_BPS=$($tx.Sum)\"
+"
 """
         result = self.conn.run(
             cmd,
@@ -143,14 +229,47 @@ Write-Output \"DISK=$disk\"
         mem_free = float(data["MEM"].split(",")[1])
         mem_used = int(mem_total - mem_free)
 
+        cpu_clock_mhz = None
+        if data.get("CLOCK"):
+            try:
+                cpu_clock_mhz = float(data["CLOCK"])
+            except ValueError:
+                pass
+
+        uptime_seconds = None
+        if data.get("UPTIME"):
+            try:
+                uptime_seconds = float(data["UPTIME"])
+            except ValueError:
+                pass
+
+        net_rx_kbps = None
+        if data.get("NET_RX_BPS"):
+            try:
+                net_rx_kbps = (float(data["NET_RX_BPS"]) * 8.0) / 1000.0
+            except ValueError:
+                pass
+
+        net_tx_kbps = None
+        if data.get("NET_TX_BPS"):
+            try:
+                net_tx_kbps = (float(data["NET_TX_BPS"]) * 8.0) / 1000.0
+            except ValueError:
+                pass
+
         return SystemMetrics(
             hostname=data["HOST"],
-            timestamp = datetime.now().isoformat(),
+            timestamp=datetime.now().isoformat(),
             cpu_temp_c=None,
             cpu_load_1m=float(data["CPU"]) / 100.0,
             mem_total_mb=int(mem_total),
             mem_used_mb=mem_used,
             disk_used_percent=float(data["DISK"]),
+            core_voltage_v=None,
+            cpu_clock_mhz=cpu_clock_mhz,
+            uptime_seconds=uptime_seconds,
+            net_rx_kbps=net_rx_kbps,
+            net_tx_kbps=net_tx_kbps,
         )
     
 
@@ -226,6 +345,7 @@ class PersistentConnection:
                 except Exception:
                     pass
                 self.conn = None
+
 
 # This class handles polling nodes, it is created and owned by driver
 # Driver will use this manager to handle the collection of metrics from targets
@@ -315,6 +435,7 @@ class PollingAgent:
         """Fully shutdown executor"""
         self.stop_all_nodes()
         self.worker_executor.shutdown(wait=True, cancel_futures=True)
+
 
 def run_node(node: Node, queue: Queue):
     """Worker thread loop for a single node"""

@@ -191,7 +191,7 @@ class SettingsScreen(BaseScreen):
         poll_dropdown = DropDown(
             self.app,
             pygame.Rect(panel_x, row_y + LABEL_H, 200, 40),
-            ["Low", "Medium", "High"],
+            ["Low", "Medium", "High", "Custom"],
             default=default_label,
         )
         poll_dropdown._label_y = row_y   # draw() uses this for the label
@@ -359,13 +359,32 @@ class SettingsScreen(BaseScreen):
         if self.selected_device:
             for key, widget in self.device_settings_widgets:
                 result = widget.handle_event(event)
-                if result is not None:
-                    device = self._get_device(self.selected_device)
-                    device[key] = result
-                    self.unsaved_changes = True
+
+                # If nothing happens
+                if result is None:
+                    continue
+                
+                # If widget is the poll_rate widget
+                if key == "poll_rate":
+                    if result == "Custom":
+                        self._activate_custom_polling()
+                        continue
+                    else:
+                        self._deactivate_custom_polling()
+
+                # Normal data collection from widgets
+                device = self._get_device(self.selected_device)
+                device[key] = result
+                self.unsaved_changes = True
 
         if self.device_apply_btn.is_clicked(pos):
             self._apply_device()
+
+        def _activate_custom_polling(self):
+            self.show_custom_textbox = True
+
+        def _deactivate_custom_polling(self):
+            self.show_custom_textbox = False
 
     # ══════════════════════════════════════════════════════════════════════
     # Drawing

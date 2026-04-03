@@ -11,6 +11,7 @@ from ui.widgets.Slider import Slider
 from ui.widgets.Dropdown import DropDown
 from ui.widgets.ConfirmationPopup import ConfirmationPopup
 from ui.widgets.ToggleSwitch import ToggleSwitch
+from ui.widgets.Textbox import Textbox
 import ui.theme as theme
 import ui.utilities as utilities
 
@@ -47,6 +48,8 @@ class SettingsScreen(BaseScreen):
         self.unsaved_changes = False
         self.sidebar_width = 220
         self.scroll_offset = 0
+        self.show_custom_textbox = False
+
 
         # System-tab state
         self.system_unsaved = False
@@ -191,7 +194,7 @@ class SettingsScreen(BaseScreen):
         poll_dropdown = DropDown(
             self.app,
             pygame.Rect(panel_x, row_y + LABEL_H, 200, 40),
-            ["Low", "Medium", "High"],
+            ["Low", "Medium", "High", "Custom"],
             default=default_label,
         )
         poll_dropdown._label_y = row_y   # draw() uses this for the label
@@ -349,6 +352,7 @@ class SettingsScreen(BaseScreen):
             return
 
         # ── Device tab ────────────────────────────────────────────────────
+        # Device selection
         for name, btn in self.device_buttons.items():
             r = btn.rect.move(0, self.scroll_offset)
             if r.collidepoint(pos):
@@ -356,16 +360,77 @@ class SettingsScreen(BaseScreen):
                 self._build_settings_widgets()
                 return
 
+        # Widget interactions
         if self.selected_device:
             for key, widget in self.device_settings_widgets:
                 result = widget.handle_event(event)
-                if result is not None:
-                    device = self._get_device(self.selected_device)
-                    device[key] = result
-                    self.unsaved_changes = True
+
+                # If nothing happens
+                if result is None:
+                    continue
+                
+                # If widget is the poll_rate widget
+                if key == "poll_rate":
+                    if result == "Custom":
+                        self._activate_custom_polling()
+                        continue
+                    else:
+                        self._deactivate_custom_polling()
+
+                # Normal data collection from widgets
+                device = self._get_device(self.selected_device)
+                device[key] = result
+                self.unsaved_changes = True
+        
+        # Custom polling textbox and keypad
+        if self.show_custom_textbox:
+            self.custom_textbox.handle_event(pos)
+
+            if self.custom_textbox.active and self.keypad:
+                key = self.keypad.handle_event(event)
+
+                if key is not None:
+                    if key == "OK":
+                        try:
+                            device["poll_rate"] = int(self.show_custom_textbox.txt)
+                            self.unsaved_changes = True
+                        except ValueError:
+                            pass
+                        self._deactivate_custom_polling()
+
+                    elif key == "DEL":
+                        self.custom_textbox.txt = self.custom_textbox.txt[:-1]
+
+                    else:
+                        self.custom_textbox.consume(key)
 
         if self.device_apply_btn.is_clicked(pos):
             self._apply_device()
+
+    def _activate_custom_polling(self):
+        # Find the poll_rate dropdown widget
+        dropdown_rect = None
+        for key, widget in self.device_settings_widgets:
+            if key == "poll_rate":
+                dropdown_rect = widget.rect
+                break
+
+        # Fallback if something weird happens
+        if dropdown_rect is None:
+            dropdown_rect = pygame.Rect(400, 200, 200, 40)
+
+        # Create textbox if needed
+        if not hasattr(self, "custom_textbox"):
+            self.custom_textbox = Textbox(
+                rect=pygame.Rect(dropdown_rect.right + 40, dropdown_rect.y, 150, 40),
+                text="Seconds",
+                title="Custom Polling"
+            )
+
+        self.show_custom_textbox = True
+
+    def _deactivate_custom_polling(self):
+        self.show_custom_textbox = False
 
     # ══════════════════════════════════════════════════════════════════════
     # Drawing
@@ -382,6 +447,9 @@ class SettingsScreen(BaseScreen):
 
         if self.confirm_popup:
             self.confirm_popup.draw(surface)
+
+        if self.show_custom_textbox:
+            self.custom_textbox.draw(surface)
 
     def _draw_header(self, surface):
         pygame.draw.rect(surface, theme.DARK_GRAY,

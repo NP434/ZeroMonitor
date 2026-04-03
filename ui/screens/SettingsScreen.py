@@ -12,6 +12,7 @@ from ui.widgets.Dropdown import DropDown
 from ui.widgets.ConfirmationPopup import ConfirmationPopup
 from ui.widgets.ToggleSwitch import ToggleSwitch
 from ui.widgets.Textbox import Textbox
+from ui.widgets.Numpad import Numpad
 import ui.theme as theme
 import ui.utilities as utilities
 
@@ -49,6 +50,8 @@ class SettingsScreen(BaseScreen):
         self.sidebar_width = 220
         self.scroll_offset = 0
         self.show_custom_textbox = False
+        self.show_numpad = False
+        self.custom_error_message = None
 
 
         # System-tab state
@@ -202,6 +205,10 @@ class SettingsScreen(BaseScreen):
         self.device_settings_widgets.append(("poll_rate", poll_dropdown))
         row_y += ROW_STRIDE
 
+        # If custom, activate the textbox
+        if default_label == "Custom":
+            self._activate_custom_polling()
+
         # ── Pause Polling row ─────────────────────────────────────────────
         pause_toggle = ToggleSwitch(
             self.app,
@@ -233,7 +240,10 @@ class SettingsScreen(BaseScreen):
         device = self._get_device(self.selected_device)
         for key, widget in self.device_settings_widgets:
             if key == "poll_rate":
-                numeric = self.POLLING_MAP.get(widget.selected, 15)
+                if widget.selected == "Custom":
+                    numeric = device.get("polling_frequency", 15)
+                else:
+                    numeric = self.POLLING_MAP.get(widget.selected, 15)
                 self.app.ui_control.change_polling_rate(device["name"], numeric)
 
             if key == "polling_paused":
@@ -382,40 +392,28 @@ class SettingsScreen(BaseScreen):
                 device[key] = result
                 self.unsaved_changes = True
         
-        # Custom polling textbox and keypad
+        # If custom textbox is visible, check if user clicked it
         if self.show_custom_textbox:
-            self.custom_textbox.handle_event(pos)
+            if self.custom_textbox.rect.collidepoint(pos):
+                self.show_numpad = True
+            else:
+                pass
 
-            if self.custom_textbox.active and self.keypad:
-                key = self.keypad.handle_event(event)
-
-                if key is not None:
-                    if key == "OK":
-                        try:
-                            device["poll_rate"] = int(self.show_custom_textbox.txt)
-                            self.unsaved_changes = True
-                        except ValueError:
-                            pass
-                        self._deactivate_custom_polling()
-
-                    elif key == "DEL":
-                        self.custom_textbox.txt = self.custom_textbox.txt[:-1]
-
-                    else:
-                        self.custom_textbox.consume(key)
+        # Handle numpad events if visible
+        if self.show_numpad:
+            self.numpad.handle_event(pos)
 
         if self.device_apply_btn.is_clicked(pos):
             self._apply_device()
 
     def _activate_custom_polling(self):
-        # Find the poll_rate dropdown widget
+        # Find dropdown rect
         dropdown_rect = None
         for key, widget in self.device_settings_widgets:
             if key == "poll_rate":
                 dropdown_rect = widget.rect
                 break
 
-        # Fallback if something weird happens
         if dropdown_rect is None:
             dropdown_rect = pygame.Rect(400, 200, 200, 40)
 
@@ -423,14 +421,57 @@ class SettingsScreen(BaseScreen):
         if not hasattr(self, "custom_textbox"):
             self.custom_textbox = Textbox(
                 rect=pygame.Rect(dropdown_rect.right + 40, dropdown_rect.y, 150, 40),
-                text="Seconds",
+                text="",
                 title="Custom Polling"
             )
 
+        # Create numpad if needed
+        if not hasattr(self, "numpad"):
+            self.numpad = Numpad(
+                x=self.custom_textbox.rect.right + 20,
+                y=self.custom_textbox.rect.y,
+                callback=self._on_numpad_key
+            )
+
         self.show_custom_textbox = True
+        self.show_numpad = False 
+
+        # Set textbox to current value
+        device = self._get_device(self.selected_device)
+        current_seconds = device.get("polling_frequency", 15)
+        self.custom_textbox.txt = str(current_seconds)
+        self.custom_error_message = None 
+
 
     def _deactivate_custom_polling(self):
         self.show_custom_textbox = False
+        self.show_numpad = False
+        self.custom_error_message = None
+
+    def _on_numpad_key(self, key):
+        if key == "DEL":
+            self.custom_textbox.txt = self.custom_textbox.txt[:-1]
+        elif key == "OK":
+            device = self._get_device(self.selected_device)
+            try:
+                val = int(self.custom_textbox.txt)
+                if 5 <= val <= 6000:
+                    device["polling_frequency"] = val
+                    self.unsaved_changes = True
+                    self.custom_error_message = None
+                else:
+                    # Invalid range, reset to current value
+                    self.custom_textbox.txt = str(device.get("polling_frequency", 15))
+                    self.custom_error_message = "Must be 5-6000"
+            except ValueError:
+                # Invalid input, reset to current value
+                self.custom_textbox.txt = str(device.get("polling_frequency", 15))
+                self.custom_error_message = "Must be 5-6000"
+            self.show_numpad = False
+            return
+        else:
+            # Append digit
+            self.custom_textbox.consume(key)
 
     # ══════════════════════════════════════════════════════════════════════
     # Drawing
@@ -537,6 +578,15 @@ class SettingsScreen(BaseScreen):
             # If it's a dropdown and it's open, save it for later
             if isinstance(widget, DropDown) and widget.expanded:
                 open_dropdowns.append(widget)
+        
+        if self.show_custom_textbox:
+            self.custom_textbox.draw(surface)
+        if self.show_numpad:
+            self.numpad.draw(surface)
+
+        if self.custom_error_message:
+            error_surf = theme.FONT_SMALL.render(self.custom_error_message, True, theme.RED)
+            surface.blit(error_surf, (self.custom_textbox.rect.x, self.custom_textbox.rect.bottom + 5))
 
         # Draw open dropdown menus LAST so they appear on top
         for dd in open_dropdowns:

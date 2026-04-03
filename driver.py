@@ -1,6 +1,5 @@
 import logging
 import uuid
-
 from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 from json import load
@@ -281,7 +280,6 @@ def load_targets(config) -> list:
         with open(config.decrypted_list, "r") as file:
             data = load(file)
     except FileNotFoundError:
-        import logging
         logging.warning("[Driver] device_list.json not found (First Boot). Starting with 0 nodes.")
         return [] # Return an empty list so the Driver doesn't crash!
     
@@ -292,7 +290,7 @@ def load_targets(config) -> list:
         host = item.get("hostname")
         user = item.get("user")
         name = item.get("name")
-        os_type = item.get("operating_system")
+        os_type = (item.get("operating_system") or "").lower()
         poll_freq = int(item.get("polling_frequency", 5))
 
         conn = PersistentConnection(
@@ -301,9 +299,9 @@ def load_targets(config) -> list:
             key_path=config.ssh_key_ram # Feeds private key
         )
         
-        if(os_type.lower() == "linux"):
+        if(os_type == "linux"):
             provider = LinuxMetricsProvider(conn)
-        elif(os_type.lower() == "windows"):
+        elif(os_type == "windows"):
             provider = WindowsMetricsProvider(conn)
         else:
             # Gracefully handle error if OS is unsupported

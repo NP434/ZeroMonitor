@@ -1,1 +1,1 @@
-{"pairing_token": "ba0a78d4", "Command": "Curl -k -H \"P-Key:{pairing_token}\" \"192.168.0.106:8443/transfer\" -o retrieved_key.pub"}
+{"pairing_token": "19021bb8", "Command": "Curl -k -H \"P-Key:{pairing_token}\" \"192.168.0.106:8443/transfer\" -o retrieved_key.pub"}

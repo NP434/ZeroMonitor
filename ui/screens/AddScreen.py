@@ -2,7 +2,7 @@ import pygame
 from pygame_vkeyboard import *
 from ui.screens.BaseScreen import BaseScreen
 from ui.widgets.Button import Button
-from ui.widgets.textbox import Textbox
+from ui.widgets.Textbox import Textbox
 import ui.theme as theme
 from ui.widgets.DisplayPopup import DisplayPopup
 

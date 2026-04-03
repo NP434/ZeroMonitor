@@ -48,6 +48,8 @@ class SettingsScreen(BaseScreen):
         self.unsaved_changes = False
         self.sidebar_width = 220
         self.scroll_offset = 0
+        self.show_custom_textbox = False
+
 
         # System-tab state
         self.system_unsaved = False

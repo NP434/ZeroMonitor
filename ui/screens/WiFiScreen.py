@@ -1,4 +1,5 @@
 import pygame
+import logging
 from ui.widgets.Button import Button
 from ui.widgets.Keyboard import Keyboard
 import ui.theme as theme
@@ -7,6 +8,12 @@ import ui.utilities as utilities
 class WiFiScreen:
     def __init__(self, app):
         self.app = app
+        self.logger = logging.getLogger("WiFi_UI")
+
+        #Connection Setup
+        self.is_connecting = False
+        self.error_message = ""
+        self.app.bus.subscribe("WIFI_RESULT", self._handle_wifi_result)
         
         # State variables
         self.ssid = ""
@@ -57,15 +64,32 @@ class WiFiScreen:
             self.password = current_text
 
     def _attempt_connection(self):
-        """Called when Connect or Enter is pressed"""
-        print(f"[WiFiScreen] Attempting to connect to: {self.ssid}")
+        """Sends the request and puts the UI into a waiting state."""
+        if self.is_connecting:
+            return # Prevent multiple clicks while already trying
+            
+        self.is_connecting = True
+        self.error_message = "" # Clear old errors
         
-        # For Dev Mode, we will just simulate a successful connection 
-        # and route directly to the next step in the First Boot flow.
-        self.app.change_screen("init_passcode")
+        self.logger.info(f"Initiating connection to: {self.ssid}")
+        self.app.bus.publish("WIFI_CONNECT_REQ", {
+            "ssid": self.ssid, 
+            "password": self.password
+        })
+
+    def _handle_wifi_result(self, data):
+        """Called automatically when the NetworkManager finishes its attempt."""
+        success = data.get("success")
+        error_msg = data.get("error", "Unknown Connection Error")
         
-        # FUTURE: You will publish to the event bus here so ControlUI can run nmcli
-        # self.app.bus.publish("CONNECT_WIFI", {"ssid": self.ssid, "password": self.password})
+        self.is_connecting = False # Stop the 'loading' state
+        
+        if success:
+            self.logger.info("WiFi Connection Successful. Routing to Passcode Setup.")
+            self.app.change_screen("init_passcode")
+        else:
+            self.logger.error(f"WiFi Connection Failed: {error_msg}")
+            self.error_message = error_msg
 
     def handle_event(self, event):
         # Use your utility to safely get the position
@@ -126,3 +150,18 @@ class WiFiScreen:
         
         # Draw Keyboard
         self.keyboard.draw(surface)
+
+        # --- DRAW ERROR MESSAGE ---
+        if self.error_message:
+            # Use FONT_SMALL from your theme
+            error_surf = theme.FONT_SMALL.render(self.error_message, True, theme.RED)
+            # Position it right under the password input box
+            surface.blit(error_surf, (self.pass_rect.x, self.pass_rect.bottom + 5))
+            
+        # --- DRAW LOADING INDICATOR ---
+        if self.is_connecting:
+            # Use FONT_SMALL or FONT_MEDIUM based on preference
+            loading_surf = theme.FONT_SMALL.render("Connecting... Please wait.", True, theme.WHITE)
+            # Center it roughly above the Connect button
+            text_x = self.connect_btn.rect.centerx - (loading_surf.get_width() // 2)
+            surface.blit(loading_surf, (text_x, self.connect_btn.rect.top - 40))

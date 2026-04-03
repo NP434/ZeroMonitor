@@ -349,6 +349,7 @@ class SettingsScreen(BaseScreen):
             return
 
         # ── Device tab ────────────────────────────────────────────────────
+        # Device selection
         for name, btn in self.device_buttons.items():
             r = btn.rect.move(0, self.scroll_offset)
             if r.collidepoint(pos):
@@ -356,6 +357,7 @@ class SettingsScreen(BaseScreen):
                 self._build_settings_widgets()
                 return
 
+        # Widget interactions
         if self.selected_device:
             for key, widget in self.device_settings_widgets:
                 result = widget.handle_event(event)
@@ -376,15 +378,37 @@ class SettingsScreen(BaseScreen):
                 device = self._get_device(self.selected_device)
                 device[key] = result
                 self.unsaved_changes = True
+        
+        # Custom polling textbox and keypad
+        if self.show_custom_textbox:
+            self.show_custom_textbox.handle_event(pos)
+
+            if self.custom_textbox.active and self.keypad:
+                key = self.keypad.handle_event(event)
+
+                if key is not None:
+                    if key == "OK":
+                        try:
+                            device["poll_rate"] = int(self.show_custom_textbox.txt)
+                            self.unsaved_changes = True
+                        except ValueError:
+                            pass
+                        self._deactivate_custom_polling()
+
+                    elif key == "DEL":
+                        self.custom_textbox.txt = self.custom_textbox.txt[:-1]
+
+                    else:
+                        self.custom_textbox.consume(key)
 
         if self.device_apply_btn.is_clicked(pos):
             self._apply_device()
 
-        def _activate_custom_polling(self):
-            self.show_custom_textbox = True
+    def _activate_custom_polling(self):
+        self.show_custom_textbox = True
 
-        def _deactivate_custom_polling(self):
-            self.show_custom_textbox = False
+    def _deactivate_custom_polling(self):
+        self.show_custom_textbox = False
 
     # ══════════════════════════════════════════════════════════════════════
     # Drawing
@@ -401,6 +425,9 @@ class SettingsScreen(BaseScreen):
 
         if self.confirm_popup:
             self.confirm_popup.draw(surface)
+
+        if self.show_custom_textbox:
+            self.custom_textbox.draw(surface)
 
     def _draw_header(self, surface):
         pygame.draw.rect(surface, theme.DARK_GRAY,

@@ -56,3 +56,5 @@ data_output.json
 
 # dev_mode artifacts
 dev_vault/
+*.log
+logs/

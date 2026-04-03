@@ -1,5 +1,24 @@
 # Entry point for the program
 import time
+import argparse
+import os
+import logging
+
+# --- LOGGING SET UP (MUST BE FIRST) ---
+# Create the hidden logs folder if it doesn't exist
+os.makedirs("logs", exist_ok=True)
+
+# Configure the global logging rules
+logging.basicConfig(
+    level=logging.INFO, 
+    format="%(asctime)s | %(levelname)-8s | [%(name)s] %(message)s",
+    handlers=[
+        logging.FileHandler("logs/system.log"), 
+        logging.StreamHandler() # Keeps printing to the terminal
+    ]
+)
+
+
 from event_bus import EventBus
 from driver import Driver
 from security_manager import SecurityManager
@@ -7,8 +26,6 @@ from datainterpreter import DataInterpreter
 from ui.display_ui import DisplayUI
 from ui.control_ui import ControlUI
 from Pairing.pairing_control import ControlPairing
-
-import argparse
 from paths import Config
 
 # Creates dev_mode tag

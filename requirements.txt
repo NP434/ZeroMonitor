@@ -4,3 +4,4 @@ pygame_vkeyboard
 flask
 pytest
 pytest-cov
+cryptography

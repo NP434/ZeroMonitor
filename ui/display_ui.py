@@ -9,22 +9,40 @@ between them.
 import pygame
 import json
 import sys
+import os
+import subprocess
 from ui.screens.MainScreen import MainScreen
 from ui.screens.SettingsScreen import SettingsScreen
 from ui.screens.AddScreen import AddScreen
-
+from ui.screens.WiFiScreen import WiFiScreen
 from ui.screens.InitScreen import InitScreen
+from ui.screens.EmailScreen import EmailScreen
 
 # initialize pygame
 pygame.init()
 
-
+'''
+# Moved inside for pathing
 def load_devices():
     path = "device_list.json"
     with open(path, "r", encoding='utf-8') as file:
         device_data = json.load(file)
         return list(device_data.values())
+'''
     
+class DummyScreen:
+    """A temporary screen to test the Boot Router"""
+    def __init__(self, name):
+        self.name = name
+    def handle_event(self, event):
+        pass
+    def update(self):
+        pass
+    def draw(self, surface):
+        surface.fill((0, 0, 0)) # Black background
+        font = pygame.font.SysFont(None, 48)
+        text = font.render(f"Stub Screen: {self.name}", True, (255, 255, 255))
+        surface.blit(text, (100, 100))
 
 class DisplayUI:
     def __init__(self, config, bus=None, ui_control=None):
@@ -43,6 +61,12 @@ class DisplayUI:
 
         # For DEV MODE and Pathing
         self.config = config 
+        # Load Devices safely using Config Paths
+        self.devices = []
+        if os.path.exists(self.config.decrypted_list):
+            with open(self.config.decrypted_list, "r", encoding='utf-8') as file:
+                device_data = json.load(file)
+                self.devices = list(device_data.values())
 
         # Event subscriptions
         self.bus.subscribe("STOP_SYSTEM", self._handle_stop_system)
@@ -58,20 +82,29 @@ class DisplayUI:
         self.screen = pygame.display.set_mode((self.width, self.height))
         pygame.display.set_caption("Zero Monitor LCD UI")
 
-        # Load Devices
-        self.devices = load_devices()
+        # Load Devices safely using Dev Mode paths
+        self.devices = []
+        if os.path.exists(self.config.decrypted_list):
+            with open(self.config.decrypted_list, "r", encoding='utf-8') as file:
+                device_data = json.load(file)
+                self.devices = list(device_data.values())
 
         # Register screens
         self.screens = {
             "main": MainScreen(self),
             "settings": SettingsScreen (self),
             "add_device": AddScreen(self),
-            "settings" : SettingsScreen(self),
-            "init": InitScreen(self)
+
+            # Boot Screens
+            "init_passcode": InitScreen(self),
+            "unlock_vault": InitScreen(self),
+            "wifi_setup": WiFiScreen(self),
+            "email_setup": EmailScreen(self)
         }
 
         # Starting on the main screen
-        self.current_screen = self.screens["init"]
+        start_key = self._boot_router()
+        self.current_screen = self.screens[start_key]
         self._running = False
 
 
@@ -128,7 +161,45 @@ class DisplayUI:
         self.screens["add_device"].token = token
 
 
+    def _boot_router(self):
+        """Evaluates the system state to determine the first screen to show."""
+        print("[UI] Evaluating boot state artifacts...")
 
+        # Step 1: Check Wi-Fi (Local LAN Connection, not Internet)
+        try:
+            # Asks NetworkManager for the active state of wlan0
+            result = subprocess.run(
+                ["nmcli", "-t", "-f", "GENERAL.STATE", "dev", "show", "wlan0"], 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            # nmcli returns "100 (connected)" if it successfully joined a network
+            if "100 (connected)" not in result.stdout:
+                print("[UI] Boot Router: No local network. Routing to WiFi Setup.")
+                return "wifi_setup"
+        except Exception as e:
+            print(f"[UI] Boot Router: Interface check failed ({e}). Routing to WiFi Setup.")
+            return "wifi_setup"
+
+        # Step 2: Check for Encrypted SSH Key
+        if not os.path.exists(self.config.ssh_key_enc):
+            print("[UI] Boot Router: No secrets found. Routing to Init Screen.")
+            return "init_passcode"
+
+        # Step 3: Check for Email Configuration OR Opt-Out
+        if not os.path.exists(self.config.email_settings):
+            return "email_setup"
+        else:
+            # Check if they explicitly opted out
+            with open(self.config.email_settings, "r") as f:
+                data = json.load(f)
+                if not data.get("email_configured") and not data.get("email_opt_out"):
+                    return "email_setup"
+        
+        # Standard Boot: Everything is good!
+        print("[UI] Boot Router: All artifacts found. Standard Boot.")
+        return "unlock_vault" # (This routes to your standard passcode unlock)
 
 
     def run(self):

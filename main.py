@@ -2,6 +2,7 @@
 import time
 from event_bus import EventBus
 from driver import Driver
+from security_manager import SecurityManager
 from datainterpreter import DataInterpreter
 from ui.display_ui import DisplayUI
 from ui.control_ui import ControlUI
@@ -36,7 +37,7 @@ data_interpreter = DataInterpreter(bus, config=config, json_filepath=config.cach
 # Create the UI backend control interface (publishing control events)
 ui_control = ControlUI(bus, config=config)
 pair_control = ControlPairing(bus)
-ui_control = ControlUI(bus, config=config)
+security = SecurityManager(event_bus=bus, config=config)
 
 # Create the Pygame UI (subscribes to backend events and renders screens)
 ui_display = DisplayUI(config=config, bus=bus, ui_control=ui_control)

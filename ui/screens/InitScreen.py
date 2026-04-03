@@ -4,7 +4,6 @@ from ui.screens.BaseScreen import BaseScreen
 import ui.theme as theme
 import ui.utilities as utilities
 import os
-import subprocess
 
 class InitScreen(BaseScreen):
     def __init__(self, app):
@@ -106,20 +105,24 @@ class InitScreen(BaseScreen):
     def _handle_standard_unlock(self):
         self._execute_script("./startup_script.sh")
 
-    def _execute_script(self, script_path):
-        # Use the pre-defined pass_file path
-        with open(self.paths.pass_file, "w") as f:
-            f.write(self.passcode)
+    def _execute_script(self, script_path=None):
+        """Now entirely decoupled from the OS. We just publish the event!"""
         
-        # Build the command dynamically
-        cmd = ["/bin/bash", script_path]
-        # Pass the 'Dev Tag' to the shell script if needed
-        if self.paths.dev_mode:
-            cmd.append("--dev")
-        subprocess.Popen(cmd)
-
+        # Determine the action
+        action = "CREATE_PASSCODE" if self.is_first_boot else "UNLOCK_VAULT"
+        print(f"[InitScreen] Publishing {action} event to backend...")
+        
+        # Hand the passcode to the EventBus
+        self.app.bus.publish(action, {"passcode": self.passcode})
+        
+        # Clear the passcode from UI memory immediately for security
         self.passcode = ""
-        self.app.change_screen("main")
+        
+        # Route the UI to the next screen
+        if self.is_first_boot:
+            self.app.change_screen("email_setup")
+        else:
+            self.app.change_screen("main")
 
     def draw(self, surface):
         surface.fill(theme.BLACK) 

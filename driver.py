@@ -275,8 +275,17 @@ class Driver:
 def load_targets(config) -> list:
     """Function to load and initialize targets from device_list.json"""
     nodes = []
-    with open(config.decrypted_list, "r") as file:
-        data = load(file)
+
+    
+    try:
+        with open(config.decrypted_list, "r") as file:
+            data = load(file)
+    except FileNotFoundError:
+        import logging
+        logging.warning("[Driver] device_list.json not found (First Boot). Starting with 0 nodes.")
+        return [] # Return an empty list so the Driver doesn't crash!
+    
+
     items = data.values()
 
     for item in items:

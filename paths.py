@@ -24,6 +24,7 @@ class Config:
         self.ssh_key_ram = os.path.join(self.ram_dir, "decrypted_key")
         self.pass_file = os.path.join(self.ram_dir, "zero_pass.txt")
         self.cache_file = os.path.join(self.storage_dir, "cache_data.json")
+        self.email_settings = os.path.join(self.storage_dir, "email_settings.json")
 
         # Ensure directories exist
         os.makedirs(self.storage_dir, exist_ok=True)

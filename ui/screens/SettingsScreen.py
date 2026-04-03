@@ -408,12 +408,25 @@ class SettingsScreen(BaseScreen):
             self._apply_device()
 
     def _activate_custom_polling(self):
+        # Find the poll_rate dropdown widget
+        dropdown_rect = None
+        for key, widget in self.device_settings_widgets:
+            if key == "poll_rate":
+                dropdown_rect = widget.rect
+                break
+
+        # Fallback if something weird happens
+        if dropdown_rect is None:
+            dropdown_rect = pygame.Rect(400, 200, 200, 40)
+
+        # Create textbox if needed
         if not hasattr(self, "custom_textbox"):
             self.custom_textbox = Textbox(
-                rect=pygame.Rect(400, 200, 120, 40),
+                rect=pygame.Rect(dropdown_rect.right + 40, dropdown_rect.y, 150, 40),
                 text="Seconds",
                 title="Custom Polling"
             )
+
         self.show_custom_textbox = True
 
     def _deactivate_custom_polling(self):

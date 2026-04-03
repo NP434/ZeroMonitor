@@ -113,12 +113,13 @@ class InitScreen(BaseScreen):
         
         # Build the command dynamically
         cmd = ["/bin/bash", script_path]
-        
         # Pass the 'Dev Tag' to the shell script if needed
         if self.paths.dev_mode:
             cmd.append("--dev")
-    
         subprocess.Popen(cmd)
+
+        self.passcode = ""
+        self.app.change_screen("main")
 
     def draw(self, surface):
         surface.fill(theme.BLACK) 

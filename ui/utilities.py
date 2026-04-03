@@ -3,6 +3,7 @@ File of functions used in multiple places within /ui
 """
 import pygame
 
+
 def get_event_pos(event, app):
     """ Return a pixel (x,y) location for different types of events """
     if event.type in (pygame.FINGERDOWN, pygame.FINGERMOTION, pygame.FINGERUP):
@@ -15,6 +16,7 @@ def get_event_pos(event, app):
         return event.pos
 
     return None
+
 
 def dim_background(app, surface):
     overlay = pygame.Surface((app.width, app.height), pygame.SRCALPHA) 

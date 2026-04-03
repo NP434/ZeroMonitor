@@ -30,7 +30,7 @@ driver = Driver(bus, config=config)
 driver.start()
 
 # Instantiate DataInterpreter to process metrics from the polling agent
-data_interpreter = DataInterpreter(bus, config=config)
+data_interpreter = DataInterpreter(bus, config=config, json_filepath=config.cache_file)
 
 # Create the UI backend control interface (publishing control events)
 ui_control = ControlUI(bus, config=config)

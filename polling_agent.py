@@ -156,9 +156,11 @@ Write-Output \"DISK=$disk\"
 # This class maintains a persistent ssh session with targets to reduce polling overhead 
 class PersistentConnection:
     """Persistent connection to reduce SSH overhead"""
-    def __init__(self, host: str, user: str, connect_timeout=5, max_retries=5):
+    def __init__(self, host: str, user: str, key_path: str, connect_timeout=5, max_retries=5):
         self.host = host
         self.user = user
+        #Add encrypted key access
+        self.key_path = key_path
         self.connect_timeout = connect_timeout
         self.max_retries = max_retries
         self.conn: Optional[Connection] = None
@@ -174,7 +176,12 @@ class PersistentConnection:
                 self.conn = Connection(
                     host=self.host,
                     user=self.user,
-                    connect_timeout=self.connect_timeout
+                    connect_timeout=self.connect_timeout,
+                    connect_kwargs={ # Use our private key only
+                        "key_filename": self.key_path, 
+                        "look_for_keys": False,
+                        "allow_agent": False
+                    }
                 )
 
     def run(self, cmd, node_name=None, stop_event=None, **kwargs):

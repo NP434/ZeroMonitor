@@ -122,7 +122,15 @@ class SecurityManager:
                 f.write(unencrypted_ssh)
 
             self.logger.info("--- Secrets Decrypted Successfully ---")
+            # Tell UI we succeeded 
+            self.bus.publish("UNLOCK_RESULT", {"success": True})
 
         except Exception as e:
-            self.logger.error(f"Decryption failed! Incorrect passcode or corrupted file. Error: {e}")
-                # FUTURE: You could publish an event back to the UI here to say "Wrong Passcode, try again"
+            error_str = str(e)
+            self.logger.error(f"Decryption failed! Error: {e}")
+
+            # Tell UI we failed
+            self.bus.publish("UNLOCK_RESULT", {
+                "success": False, 
+                "error": error_str
+            })

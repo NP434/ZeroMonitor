@@ -97,7 +97,6 @@ class DisplayUI:
 
             # Boot Screens
             "init_passcode": InitScreen(self),
-            "unlock_vault": InitScreen(self),
             "wifi_setup": WiFiScreen(self),
             "email_setup": EmailScreen(self)
         }

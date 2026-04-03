@@ -5,6 +5,7 @@ import ui.theme as theme
 import ui.utilities as utilities
 import os
 import json
+import logging
 
 class InitScreen(BaseScreen):
     def __init__(self, app):
@@ -12,9 +13,15 @@ class InitScreen(BaseScreen):
 
         # Use Paths
         self.paths = self.app.config
+        self.logger = logging.getLogger("Password_UI")
 
         # Check for boot mode
         self.is_first_boot = not os.path.exists(self.paths.ssh_key_enc)
+
+        # Event Handling
+        self.error_message = ""
+        self.is_waiting = False # Prevents user from entering more dots while checking
+        self.app.bus.subscribe("UNLOCK_RESULT", self._on_unlock_result)
 
         # Store User Entered Passcode
         self.passcode = ""
@@ -63,6 +70,10 @@ class InitScreen(BaseScreen):
         ))
 
     def handle_event(self, event):
+        # Guard against Spam
+        if self.is_waiting:
+            return
+
         # Need to get position from utility
         pos = utilities.get_event_pos(event, self.app)
 
@@ -109,37 +120,51 @@ class InitScreen(BaseScreen):
     def _execute_script(self, script_path=None):
         # Determine the action
         action = "CREATE_PASSCODE" if self.is_first_boot else "UNLOCK_VAULT"
-        print(f"[InitScreen] Publishing {action} event to backend...")
+        self.logger.info(f"Publishing {action} event...")
+
+        self.is_waiting = True # Lock the UI
+        self.error_message = "" # Clear old errors
         
         # Hand the passcode to the EventBus
         self.app.bus.publish(action, {"passcode": self.passcode})
         self.passcode = ""
         
-        # Route the UI
-        if self.is_first_boot:
-            self.app.change_screen("email_setup")
-        else:
-            email_setup_complete = False
-            
-            # Step A: Prevent FileNotFoundError
-            if os.path.exists(self.config.email_settings):
-                try:
-                    # Step B: Actually read the flags like you suggested!
-                    with open(self.config.email_settings, "r") as f:
-                        data = json.load(f)
-                        # If they either explicitly configured it OR explicitly opted out, they are done.
-                        if data.get("email_configured") or data.get("email_opt_out"):
-                            email_setup_complete = True
-                except Exception as e:
-                    print(f"[InitScreen] Error reading email JSON, assuming incomplete: {e}")
-                    
-            # Step C: Route based on the verified flags
-            if not email_setup_complete:
-                print("[InitScreen] Notice: Email settings incomplete. Routing to Email Setup.")
+    def _on_unlock_result(self, data):
+        """Handles the response from the SecurityManager."""
+        self.is_waiting = False
+
+        if data.get("success"):
+            self.logger.info("Unlock Successful.")
+            if self.is_first_boot:
                 self.app.change_screen("email_setup")
             else:
-                print("[InitScreen] Fully authenticated and configured. Welcome to the dashboard!")
-                self.app.change_screen("main")
+                email_setup_complete = False
+                
+                # Step A: Prevent FileNotFoundError
+                if os.path.exists(self.config.email_settings):
+                    try:
+                        # Step B: Actually read the flags like you suggested!
+                        with open(self.config.email_settings, "r") as f:
+                            data = json.load(f)
+                            # If they either explicitly configured it OR explicitly opted out, they are done.
+                            if data.get("email_configured") or data.get("email_opt_out"):
+                                email_setup_complete = True
+                    except Exception as e:
+                        self.logger.error(f"Error reading email JSON, assuming incomplete: {e}")
+                        
+                # Step C: Route based on the verified flags
+                if not email_setup_complete:
+                    self.logger.warning(f"Email settings incomplete. Routing to Email Setup.")
+                    self.app.change_screen("email_setup")
+                else:
+                    self.logger.info(f"Fully authenticated and configured. Welcome to the dashboard!")
+                    self.app.change_screen("main")
+        
+        else:
+            # Failure: Show error and reset
+            self.error_message = data.get("error") or "Incorrect Passcode"
+            self.passcode = "" # Clear the dots
+            self.logger.error(f"Unlock failed: {self.error_message}")
 
     def draw(self, surface):
         surface.fill(theme.BLACK) 
@@ -156,6 +181,12 @@ class InitScreen(BaseScreen):
         title = theme.DEFAULT_FONT.render(prompt_text, True, theme.WHITE)
         surface.blit(title, (self.app.width // 2 - title.get_width() // 2, 60))
 
+        # Draw Error Message in Red
+        if self.error_message:
+            error_surf = theme.FONT_SMALL.render(self.error_message, True, theme.RED)
+            x = self.app.width // 2 - error_surf.get_width() // 2
+            surface.blit(error_surf, (x, 150))
+
         # Draw Passcode Dots (iphone style)
         dot_spacing = 30
         num_dots = 8
@@ -164,8 +195,15 @@ class InitScreen(BaseScreen):
 
         for i in range(num_dots):
             x = start_x + (i * dot_spacing)
-            color = theme.YELLOW if i < len(self.passcode) else (50, 50, 50)
+            if self.is_waiting:
+                color = (100, 100, 100) # Dim the dots to show "Busy"
+            else:
+                color = theme.YELLOW if i < len(self.passcode) else (50, 50, 50)
             pygame.draw.circle(surface, color, (x, 120), 8)
+
+        if self.is_waiting:
+            loading = theme.FONT_SMALL.render("Decrypting Vault...", True, theme.WHITE)
+            surface.blit(loading, (self.app.width // 2 - loading.get_width() // 2, 150))
 
         # Draw all the circular buttons
         for btn in self.buttons:

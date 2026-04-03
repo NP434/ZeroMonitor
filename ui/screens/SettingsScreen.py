@@ -384,7 +384,7 @@ class SettingsScreen(BaseScreen):
         
         # Custom polling textbox and keypad
         if self.show_custom_textbox:
-            self.show_custom_textbox.handle_event(pos)
+            self.custom_textbox.handle_event(pos)
 
             if self.custom_textbox.active and self.keypad:
                 key = self.keypad.handle_event(event)

@@ -71,7 +71,11 @@ class Driver:
             "PAUSE_POLLING",
              self._on_pause_polling
         )
-        # Will need to add many more based on which UI events need to occur
+
+        self.event_bus.subscribe(
+            "UPDATE_DEVICE_NAME",
+            self.update_device_name
+        )
 
         # Load targets and launch polling
         nodes = load_targets(self.config)
@@ -100,6 +104,12 @@ class Driver:
             json.dump(data, f, indent=4)
 
         self.reload_config()
+
+        # Acknowledge polling rate update
+        self.event_bus.publish("ACK_UPDATE_POLLING_RATE", {
+            "host": host,
+            "poll_rate": new_rate
+        })
 
     def _handle_remove_node(self, payload):
         """Handler function that formats data for remove_node"""
@@ -267,6 +277,30 @@ class Driver:
             "device": device,
             "paused": paused
         })
+
+    def update_device_name(self, payload):
+        old_name = payload["old_name"]
+        new_name = payload["new_name"]
+        with open(self.config.decrypted_list, "r") as f:
+            data = load(f)
+
+        updated = False
+        for item in data.values():
+            if item.get("name") == old_name:
+                item["name"] = new_name
+                updated = True
+
+        if updated:
+            with open(self.config.decrypted_list, "w") as f:
+                import json
+                json.dump(data, f, indent=4)
+
+            self.reload_config()
+
+            self.event_bus.publish("ACK_UPDATE_DEVICE_NAME", {
+                "old_name": old_name,
+                "new_name": new_name
+            })
 
 
 

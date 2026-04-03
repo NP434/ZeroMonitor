@@ -62,6 +62,12 @@ class ControlUI:
             "paused": paused
         })
 
+    def change_device_name(self, old_name, new_name):
+        self.bus.publish("UPDATE_DEVICE_NAME", {
+            "old_name": old_name,
+            "new_name": new_name
+        })
+
     def is_raspberry_pi(self):
         try:
             with open("/proc/cpuinfo", "r") as f:

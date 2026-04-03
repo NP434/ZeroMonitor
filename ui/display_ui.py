@@ -72,8 +72,10 @@ class DisplayUI:
         self.bus.subscribe("STOP_SYSTEM", self._handle_stop_system)
         self.bus.subscribe("ACK_REMOVE_NODE", self._handle_ack_remove)
         self.bus.subscribe("ACK_POLLING_PAUSED", self._on_ack_polling_paused)
+        self.bus.subscribe("ACK_UPDATE_POLLING_RATE", self._on_ack_update_polling_rate)
         self.bus.subscribe("DEVICE_LIST_UPDATED", self._handle_device_list_update)
         self.bus.subscribe("Display_token",self._handle_token_display)
+        self.bus.subscribe("ACK_UPDATE_DEVICE_NAME", self._handle_ack_update_name)
 
         # Establish screen resolution
         self.width = 1024
@@ -146,6 +148,67 @@ class DisplayUI:
         # If currently in SettingsScreen, rebuild widgets
         if isinstance(self.current_screen, SettingsScreen):
             self.current_screen._build_settings_widgets()
+
+    def _on_ack_update_polling_rate(self, payload):
+        host = payload["host"]
+        rate = payload["poll_rate"]
+
+        # Update local device data
+        for d in self.devices:
+            if d["name"] == host:
+                d["polling_frequency"] = rate
+
+        # Notify current screen
+        if isinstance(self.current_screen, SettingsScreen):
+            screen = self.current_screen
+            # If a name change was pending, now commit it after polling ack
+            if getattr(screen, "pending_name_change", None):
+                old_name, new_name = screen.pending_name_change
+                screen.pending_polling_change = False
+                screen._commit_name_change(old_name, new_name)
+
+            screen._build_device_list()
+            screen._build_settings_widgets()
+
+        if isinstance(self.current_screen, MainScreen):
+            self.current_screen._build_device_buttons()
+
+        # Also update main screen object if not active
+        main_screen = self.screens.get("main")
+        if main_screen and not isinstance(self.current_screen, MainScreen):
+            main_screen._build_device_buttons()
+
+    def _handle_ack_update_name(self, payload):
+        old_name = payload["old_name"]
+        new_name = payload["new_name"]
+
+        # Update local device list
+        for d in self.devices:
+            if d["name"] == old_name:
+                d["name"] = new_name
+
+        # Update current screen if needed
+        if isinstance(self.current_screen, SettingsScreen):
+            screen = self.current_screen
+            if screen.selected_device == old_name:
+                screen.selected_device = new_name
+            screen._build_device_list()
+            screen._build_settings_widgets()
+
+        if isinstance(self.current_screen, MainScreen):
+            self.current_screen._build_device_buttons()
+
+        # Also update sidebar data in main screen object if not currently active
+        main_screen = self.screens.get("main")
+        if main_screen and main_screen is not self.current_screen:
+            main_screen._build_device_buttons()
+        if isinstance(self.current_screen, SettingsScreen):
+            screen = self.current_screen
+            if screen.selected_device == old_name:
+                screen.selected_device = new_name
+            # Update device_buttons
+            if old_name in screen.device_buttons:
+                screen.device_buttons[new_name] = screen.device_buttons.pop(old_name)
 
 
     def _handle_device_list_update(self, devices):

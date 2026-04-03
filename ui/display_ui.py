@@ -164,42 +164,46 @@ class DisplayUI:
     def _boot_router(self):
         """Evaluates the system state to determine the first screen to show."""
         print("[UI] Evaluating boot state artifacts...")
-
-        # Step 1: Check Wi-Fi (Local LAN Connection, not Internet)
-        try:
-            # Asks NetworkManager for the active state of wlan0
-            result = subprocess.run(
-                ["nmcli", "-t", "-f", "GENERAL.STATE", "dev", "show", "wlan0"], 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            # nmcli returns "100 (connected)" if it successfully joined a network
-            if "100 (connected)" not in result.stdout:
-                print("[UI] Boot Router: No local network. Routing to WiFi Setup.")
-                return "wifi_setup"
-        except Exception as e:
-            print(f"[UI] Boot Router: Interface check failed ({e}). Routing to WiFi Setup.")
-            return "wifi_setup"
-
-        # Step 2: Check for Encrypted SSH Key
-        if not os.path.exists(self.config.ssh_key_enc):
-            print("[UI] Boot Router: No secrets found. Routing to Init Screen.")
+        
+        # 1. Check if the device has an encrypted vault (SSH Key)
+        is_first_boot = not os.path.exists(self.config.ssh_key_enc)
+        
+        # ==========================================
+        # STANDARD BOOT (Vault Exists)
+        # ==========================================
+        if not is_first_boot:
+            # Standard Boot: Always authenticate first!
+            print("[UI] Vault found. Standard Boot. Routing to Unlock Screen.")
             return "init_passcode"
 
-        # Step 3: Check for Email Configuration OR Opt-Out
-        if not os.path.exists(self.config.email_settings):
-            return "email_setup"
-        else:
-            # Check if they explicitly opted out
-            with open(self.config.email_settings, "r") as f:
-                data = json.load(f)
-                if not data.get("email_configured") and not data.get("email_opt_out"):
-                    return "email_setup"
+        # ==========================================
+        # FIRST BOOT (No Vault Exists)
+        # ==========================================
+        print("[UI] First Boot detected. Checking network...")
         
-        # Standard Boot: Everything is good!
-        print("[UI] Boot Router: All artifacts found. Standard Boot.")
-        return "unlock_vault" # (This routes to your standard passcode unlock)
+        # Step 1: Check Wi-Fi
+        if self.config.dev_mode:
+            print("[UI] DEV MODE: Faking network disconnect to test WiFi UI.")
+            return "wifi_setup"
+        else:
+            try:
+                # Asks NetworkManager for the active state of wlan0
+                result = subprocess.run(
+                    ["nmcli", "-t", "-f", "GENERAL.STATE", "dev", "show", "wlan0"], 
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                if "100 (connected)" not in result.stdout:
+                    print("[UI] Boot Router: No local network. Routing to WiFi Setup.")
+                    return "wifi_setup"
+            except Exception as e:
+                print(f"[UI] Boot Router: Interface check failed ({e}). Routing to WiFi Setup.")
+                return "wifi_setup"
+
+        # Step 2: If Wi-Fi is connected, go straight to Passcode creation
+        print("[UI] Network connected. Routing to Passcode Setup.")
+        return "init_passcode"
 
 
     def run(self):

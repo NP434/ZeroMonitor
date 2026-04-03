@@ -17,6 +17,7 @@ logging.basicConfig(
         logging.StreamHandler() # Keeps printing to the terminal
     ]
 )
+logging.info("=" * 60)
 
 
 from event_bus import EventBus

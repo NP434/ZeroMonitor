@@ -4,6 +4,7 @@ from ui.screens.BaseScreen import BaseScreen
 import ui.theme as theme
 import ui.utilities as utilities
 import os
+import json
 
 class InitScreen(BaseScreen):
     def __init__(self, app):
@@ -106,23 +107,39 @@ class InitScreen(BaseScreen):
         self._execute_script("./startup_script.sh")
 
     def _execute_script(self, script_path=None):
-        """Now entirely decoupled from the OS. We just publish the event!"""
-        
         # Determine the action
         action = "CREATE_PASSCODE" if self.is_first_boot else "UNLOCK_VAULT"
         print(f"[InitScreen] Publishing {action} event to backend...")
         
         # Hand the passcode to the EventBus
         self.app.bus.publish(action, {"passcode": self.passcode})
-        
-        # Clear the passcode from UI memory immediately for security
         self.passcode = ""
         
-        # Route the UI to the next screen
+        # Route the UI
         if self.is_first_boot:
             self.app.change_screen("email_setup")
         else:
-            self.app.change_screen("main")
+            email_setup_complete = False
+            
+            # Step A: Prevent FileNotFoundError
+            if os.path.exists(self.config.email_settings):
+                try:
+                    # Step B: Actually read the flags like you suggested!
+                    with open(self.config.email_settings, "r") as f:
+                        data = json.load(f)
+                        # If they either explicitly configured it OR explicitly opted out, they are done.
+                        if data.get("email_configured") or data.get("email_opt_out"):
+                            email_setup_complete = True
+                except Exception as e:
+                    print(f"[InitScreen] Error reading email JSON, assuming incomplete: {e}")
+                    
+            # Step C: Route based on the verified flags
+            if not email_setup_complete:
+                print("[InitScreen] Notice: Email settings incomplete. Routing to Email Setup.")
+                self.app.change_screen("email_setup")
+            else:
+                print("[InitScreen] Fully authenticated and configured. Welcome to the dashboard!")
+                self.app.change_screen("main")
 
     def draw(self, surface):
         surface.fill(theme.BLACK) 

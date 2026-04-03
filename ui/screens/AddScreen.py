@@ -87,11 +87,21 @@ class AddScreen(BaseScreen):
     def end_token_disp(self):
         self.token_to_be_disp = False
         self.token = None
+        self.popup = None
 
     def update(self):
         if self.active_textbox and self._events:
             self.keyboard.update(self._events)
             self._events.clear()
+
+        if self.token_to_be_disp:
+                self.popup = DisplayPopup(
+                    app=self.app,
+                    message=f"Pairing Token: {self.token}",
+                    on_confirm=self.end_token_disp
+                )
+        if not self.token_to_be_disp:
+            self.popup = None
     
     
     def handle_event(self,event):
@@ -176,12 +186,7 @@ class AddScreen(BaseScreen):
                     self.active_textbox.activate(False)
                     self.active_textbox = None
                 self.keyboard.disable()
-            if self.token_to_be_disp:
-                self.popup = DisplayPopup(
-                    app=self.app,
-                    message=f"Pairing Token: {self.token}",
-                    on_confirm=self.end_token_disp
-                )
+
                 
 
 

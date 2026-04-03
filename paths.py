@@ -14,7 +14,7 @@ class Config:
             self.ram_dir = os.path.join(self.base_dir, "dev_vault", "ram")
         else:
             # Standard Raspberry Pi paths
-            self.storage_dir = "/home/admin/zero_monitor_storage"
+            self.storage_dir = "/home/zero_monitor_storage"
             self.ram_dir = "/run/zero_monitor_decrypted"
 
         # Specific File Paths
@@ -23,6 +23,8 @@ class Config:
         self.ssh_key_enc = os.path.join(self.storage_dir, "id_ed25519.enc")
         self.ssh_key_ram = os.path.join(self.ram_dir, "decrypted_key")
         self.pass_file = os.path.join(self.ram_dir, "zero_pass.txt")
+        self.cache_file = os.path.join(self.storage_dir, "cache_data.json")
+        self.email_settings = os.path.join(self.storage_dir, "email_settings.json")
 
         # Ensure directories exist
         os.makedirs(self.storage_dir, exist_ok=True)

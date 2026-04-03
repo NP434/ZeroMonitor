@@ -75,7 +75,7 @@ class Driver:
         # Will need to add many more based on which UI events need to occur
 
         # Load targets and launch polling
-        nodes = load_targets()
+        nodes = load_targets(self.config)
         self.polling_agent.launch_nodes(nodes)
 
         self.running = True
@@ -89,14 +89,14 @@ class Driver:
         """Function to update the polling rate of a particular node"""
         host = payload["host"]
         new_rate = payload["poll_rate"]
-        with open("device_list.json", "r") as f:
+        with open(self.config.decrypted_list, "r") as f:
             data = load(f)
 
         for item in data.values():
             if item.get("name") == host:
                 item["polling_frequency"] = new_rate
 
-        with open("device_list.json", "w") as f:
+        with open(self.config.decrypted_list, "w") as f:
             import json
             json.dump(data, f, indent=4)
 
@@ -118,7 +118,7 @@ class Driver:
 
         # Open the device list
         try:
-            with open("device_list.json", "r") as f:
+            with open(self.config.decrypted_list, "r") as f:
                 data = load(f)
 
             removed_key = None
@@ -132,7 +132,7 @@ class Driver:
             if removed_key:
                 del data[removed_key]
 
-                with open("device_list.json", "w") as f:
+                with open(self.config.decrypted_list, "w") as f:
                     import json
                     json.dump(data, f, indent=4)
 
@@ -194,7 +194,7 @@ class Driver:
             node_config.get("name")
         )
 
-        with open("device_list.json", "r") as f:
+        with open(self.config.decrypted_list, "r") as f:
             data = load(f)
 
         # Prevent duplicates by name
@@ -212,7 +212,7 @@ class Driver:
         # Create new entry for the new id
         data[new_id] = node_config
 
-        with open("device_list.json", "w") as f:
+        with open(self.config.decrypted_list, "w") as f:
             import json
             json.dump(data, f, indent=4)
 
@@ -242,11 +242,11 @@ class Driver:
         """Helper function that reloads configuration and reconciles nodes"""
         logging.info("[Driver] Reloading configuration")
 
-        nodes = load_targets()
+        nodes = load_targets(self.config)
         self.polling_agent.reconcile(nodes)
 
         # Publish device list to UI
-        with open ("device_list.json", "r") as f:
+        with open (self.config.decrypted_list, "r") as f:
             device_list = load(f)
         self.event_bus.publish("DEVICE_LIST_UPDATED", device_list)
 
@@ -272,11 +272,20 @@ class Driver:
 
 
 # Load and initialize targets from device_list.json
-def load_targets() -> list:
+def load_targets(config) -> list:
     """Function to load and initialize targets from device_list.json"""
     nodes = []
-    with open("device_list.json", "r") as file:
-        data = load(file)
+
+    
+    try:
+        with open(config.decrypted_list, "r") as file:
+            data = load(file)
+    except FileNotFoundError:
+        import logging
+        logging.warning("[Driver] device_list.json not found (First Boot). Starting with 0 nodes.")
+        return [] # Return an empty list so the Driver doesn't crash!
+    
+
     items = data.values()
 
     for item in items:
@@ -286,7 +295,12 @@ def load_targets() -> list:
         os_type = item.get("operating_system")
         poll_freq = int(item.get("polling_frequency", 5))
 
-        conn = PersistentConnection(host=host, user=user)
+        conn = PersistentConnection(
+            host=host, 
+            user=user,
+            key_path=config.ssh_key_ram # Feeds private key
+        )
+        
         if(os_type.lower() == "linux"):
             provider = LinuxMetricsProvider(conn)
         elif(os_type.lower() == "windows"):

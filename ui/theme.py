@@ -6,8 +6,10 @@ pygame.font.init()
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 DARK_GRAY = (30, 30, 30)
+DARK_GREY = (30, 30, 30)
 GRAY = (60, 60, 60)
 LIGHT_GRAY = (100, 100, 100)
+LIGHT_GREY = (100, 100, 100)
 
 # Colors - Status & Severity
 BLUE = (0, 120, 255)

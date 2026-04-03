@@ -21,18 +21,42 @@ class MainScreen(BaseScreen):
         "mem_used_percent": "Memory Usage",
         "mem_used_mb": "Memory Used",
         "mem_total_mb": "Memory Total",
-        "disk_used_percent": "Disk Usage"
+        "disk_used_percent": "Disk Usage",
+        "core_voltage_v": "Core Voltage",
+        "cpu_clock_mhz": "CPU Clock",
+        "uptime_seconds": "Uptime",
+        "net_rx_kbps": "Network Download",
+        "net_tx_kbps": "Network Upload",
     }
 
     # Metric units for display
     METRIC_UNITS = {
         "cpu_load_1m": "",
-        "cpu_temp_c": "°C",
+        "cpu_temp_c": " C",
         "mem_used_percent": "%",
-        "mem_used_mb": "MB",
-        "mem_total_mb": "MB",
-        "disk_used_percent": "%"
+        "mem_used_mb": " MB",
+        "mem_total_mb": " MB",
+        "disk_used_percent": "%",
+        "core_voltage_v": " V",
+        "cpu_clock_mhz": " MHz",
+        "uptime_seconds": "",
+        "net_rx_kbps": " kbps",
+        "net_tx_kbps": " kbps",
     }
+
+    METRIC_ORDER = [
+        "cpu_load_1m",
+        "cpu_temp_c",
+        "mem_used_percent",
+        "disk_used_percent",
+        "mem_used_mb",
+        "mem_total_mb",
+        "cpu_clock_mhz",
+        "core_voltage_v",
+        "net_rx_kbps",
+        "net_tx_kbps",
+        "uptime_seconds",
+    ]
 
     def __init__(self, app):
         super().__init__(app)
@@ -122,6 +146,16 @@ class MainScreen(BaseScreen):
         self.cache_data = {}
         self._load_cache_data()
 
+        # Independent scroll state for metric card viewport
+        self.metric_scroll = 0
+        self.metric_content_height = 0
+        self.metric_viewport_rect = None
+        self.metric_scrollbar_track_rect = None
+        self.metric_scrollbar_thumb_rect = None
+        self.metric_drag_active = False
+        self.metric_drag_pointer_id = None
+        self.metric_drag_thumb_offset_y = 0
+
     def _load_cache_data(self):
         """Load cache data from cache_data.json"""
         cache_filepath = "data/cache_data.json"
@@ -135,17 +169,24 @@ class MainScreen(BaseScreen):
 
 
     def handle_event(self, event):
-        if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
-            # Determine position based on event type
-            if event.type == pygame.FINGERDOWN:
-                # Finger coordinates are normalized (0.0 - 1.0)
-                pos = (
-                    int(event.x * self.app.width),
-                    int(event.y * self.app.height)
-                )
-            else:
-                # Mouse event provides pixel coordinates
-                pos = event.pos
+        pos = self._event_pos(event)
+
+        if event.type in (pygame.MOUSEBUTTONUP, pygame.FINGERUP):
+            self.metric_drag_active = False
+            self.metric_drag_pointer_id = None
+
+        elif event.type in (pygame.MOUSEMOTION, pygame.FINGERMOTION) and self.metric_drag_active:
+            if event.type == pygame.FINGERMOTION and self.metric_drag_pointer_id is not None:
+                if event.finger_id != self.metric_drag_pointer_id:
+                    self.sidebar.handle_event(event)
+                    return
+
+            if pos is not None:
+                self._set_metric_scroll_from_thumb_top(pos[1] - self.metric_drag_thumb_offset_y)
+
+        elif event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
+            if self._try_start_metric_scroll_drag(event, pos):
+                return
 
             # Handle popups
             if self.popup:
@@ -162,7 +203,7 @@ class MainScreen(BaseScreen):
             if self.settings_button.is_clicked(pos):
                 self.app.change_screen("settings")
                 return
-            
+
             # Clock button clicked
             if self.clock_button.is_clicked(pos):
                 self.use_24hr = not self.use_24hr
@@ -173,8 +214,9 @@ class MainScreen(BaseScreen):
                     scrolled_rect = btn.rect.move(0, self.device_scroll)
                     if scrolled_rect.collidepoint(pos):
                         self.selected_device = btn.device
+                        self.metric_scroll = 0
                         self._build_stat_buttons()
-                
+
                 if self.remove_button.is_clicked(pos):
                     self._enter_remove_mode()
 
@@ -190,7 +232,7 @@ class MainScreen(BaseScreen):
                             self.popup = ConfirmationPopup(
                                 app=self.app,
                                 message=f"Remove {device_name}?",
-                                on_confirm=lambda name = device_name: self._confirm_remove(name),
+                                on_confirm=lambda name=device_name: self._confirm_remove(name),
                                 on_cancel=self._exit_remove_mode
                             )
                             return
@@ -202,9 +244,36 @@ class MainScreen(BaseScreen):
                         print(f"Clicked stat: {key}")
 
         elif event.type == pygame.MOUSEWHEEL:
-            self.scroll_devices(event.y)
+            mouse_pos = pygame.mouse.get_pos()
+            if mouse_pos[0] <= self.sidebar.current_width:
+                self.scroll_devices(event.y)
+            elif self.selected_device and self.metric_viewport_rect and self.metric_viewport_rect.collidepoint(mouse_pos):
+                self.scroll_metrics(event.y)
+            else:
+                self.scroll_devices(event.y)
 
         self.sidebar.handle_event(event)
+
+    def _event_pos(self, event):
+        if event.type in (pygame.FINGERDOWN, pygame.FINGERMOTION, pygame.FINGERUP):
+            return (int(event.x * self.app.width), int(event.y * self.app.height))
+        if hasattr(event, "pos"):
+            return event.pos
+        return None
+
+    def _try_start_metric_scroll_drag(self, event, pos):
+        if not self.selected_device or pos is None:
+            return False
+        if not self.metric_scrollbar_thumb_rect:
+            return False
+
+        if self.metric_scrollbar_thumb_rect.collidepoint(pos):
+            self.metric_drag_active = True
+            self.metric_drag_thumb_offset_y = pos[1] - self.metric_scrollbar_thumb_rect.y
+            self.metric_drag_pointer_id = getattr(event, "finger_id", None)
+            return True
+
+        return False
 
     def update(self):
         self.sidebar.update()
@@ -219,9 +288,6 @@ class MainScreen(BaseScreen):
         pygame.draw.rect(surface, theme.DARK_GRAY, (0, 0, self.app.width, top_bar_height))
         pygame.draw.line(surface, theme.BLUE, (0, top_bar_height), (self.app.width, top_bar_height), 2)
 
-        # --- Top Bar Elements ---
-
-        # Time (topleft)
         if self.use_24hr:
             now = datetime.datetime.now().strftime("%H:%M")
         else:
@@ -230,98 +296,87 @@ class MainScreen(BaseScreen):
         time_text = theme.FONT_MEDIUM.render(now, True, theme.BRIGHT_BLUE)
         surface.blit(time_text, (30, 25))
 
-        # Title Centered Horizontally
-        title_text = pygame.font.SysFont("Arial", 40, bold=True).render("⚡ Zero Monitor", True, theme.BRIGHT_BLUE)
+        title_text = pygame.font.SysFont("Arial", 36, bold=True).render("Zero Monitor", True, theme.BRIGHT_BLUE)
         title_rect = title_text.get_rect(center=(self.app.width // 2, 45))
         surface.blit(title_text, title_rect)
 
-        # Draw Settings Button
         self.settings_button.draw(surface)
-
-        # Draw Power Button
         self.power_button.draw(surface)
 
-        # Draw selected device name
         if self.selected_device:
             sidebar_width = self.sidebar.current_width
-            content_area_width = self.app.width - sidebar_width
-            content_start_x = sidebar_width + 50
-            content_center_x = sidebar_width + content_area_width // 2
+            content_left = sidebar_width + 28
+            content_right = self.app.width - 24
+            content_width = max(260, content_right - content_left)
+            content_center_x = content_left + content_width // 2
 
-            # Device title
-            title_font = pygame.font.SysFont("Arial", 36, bold=True)
-            name_text = title_font.render(f"{self.selected_device['name']}", True, theme.BLUE)
-            name_rect = name_text.get_rect(center=(content_center_x, 130))
-            surface.blit(name_text, name_rect)
+            device_name_font = pygame.font.SysFont("Arial", 28, bold=True)
+            device_name = device_name_font.render(f"{self.selected_device['name']}", True, theme.BRIGHT_BLUE)
+            device_name_rect = device_name.get_rect(center=(content_center_x, 126))
+            surface.blit(device_name, device_name_rect)
 
-            # Horizontal line separator
-            pygame.draw.line(surface, theme.GRAY, (content_start_x, 160), (self.app.width - 30, 160), 2)
+            pygame.draw.line(surface, theme.GRAY, (content_left, 154), (content_right, 154), 2)
 
-            # Get device data from cache
-            device_name = self.selected_device["name"]
-            device_data = self.cache_data.get(device_name, {})
+            device_name_key = self.selected_device["name"]
+            device_data = self.cache_data.get(device_name_key, {})
             metrics = device_data.get("metrics", {})
             severities = device_data.get("severities", {})
-            timestamp = device_data.get("timestamp", "N/A")
+            timestamp = self._format_timestamp(device_data.get("timestamp", "N/A"))
 
-            # Display timestamp in smaller font
-            timestamp_parts = timestamp.split("T")
-            timestamp_display = f"Updated: {timestamp_parts[0]} {timestamp_parts[1].split('.')[0]}" if "T" in timestamp else f"Updated: {timestamp}"
-            timestamp_text = theme.FONT_SMALL.render(timestamp_display, True, theme.GRAY)
-            surface.blit(timestamp_text, (content_start_x, 175))
+            timestamp_text = theme.FONT_SMALL.render(f"Updated: {timestamp}", True, theme.LIGHT_GRAY)
+            surface.blit(timestamp_text, (content_left, 166))
 
-            # Display metrics in single column for better clarity
-            metric_y = 220
-            metric_spacing = 75
-            content_area_width = self.app.width - sidebar_width - 80
+            # Build a stable metric list with preferred order first, then any extras.
+            ordered_metrics = []
+            seen = set()
+            for key in self.METRIC_ORDER:
+                if key in metrics:
+                    ordered_metrics.append((key, metrics.get(key)))
+                    seen.add(key)
+            for key, value in metrics.items():
+                if key not in seen:
+                    ordered_metrics.append((key, value))
 
-            metrics_list = list(metrics.items())
+            grid_top = 198
+            card_gap = 14
+            card_height = 82
+            columns = 2
+            card_width = (content_width - card_gap) // columns
 
-            for metric_name, metric_value in metrics_list:
-                severity = severities.get(metric_name, "normal")
-                severity_color = theme.STATUS_COLORS.get(severity, theme.WHITE)
+            rows = (len(ordered_metrics) + columns - 1) // columns
+            self.metric_content_height = max(0, rows * (card_height + card_gap) - card_gap)
 
-                # Get friendly metric name and unit
+            viewport_bottom = self.app.height - 30
+            self.metric_viewport_rect = pygame.Rect(
+                content_left,
+                grid_top,
+                content_width,
+                max(0, viewport_bottom - grid_top),
+            )
+            self._clamp_metric_scroll()
+
+            old_clip = surface.get_clip()
+            surface.set_clip(self.metric_viewport_rect)
+
+            for idx, (metric_name, metric_value) in enumerate(ordered_metrics):
+                row = idx // columns
+                col = idx % columns
+                x = content_left + (col * (card_width + card_gap))
+                y = grid_top + row * (card_height + card_gap) + self.metric_scroll
+                rect = pygame.Rect(x, y, card_width, card_height)
+
+                if not rect.colliderect(self.metric_viewport_rect):
+                    continue
+
                 friendly_name = self.METRIC_NAMES.get(metric_name, metric_name.replace("_", " ").title())
-                unit = self.METRIC_UNITS.get(metric_name, "")
+                severity = severities.get(metric_name, "normal")
+                value_text = self._format_metric_value(metric_name, metric_value)
+                self._draw_metric_card(surface, rect, friendly_name, value_text, severity)
 
-                # Format metric display
-                if isinstance(metric_value, float):
-                    display_value = f"{metric_value:.2f}"
-                else:
-                    display_value = str(metric_value)
-
-                # Draw metric background box
-                metric_box_width = content_area_width - 40
-                metric_box_height = 60
-                metric_box = pygame.Rect(content_start_x - 15, metric_y - 15, metric_box_width, metric_box_height)
-
-                # Draw background
-                pygame.draw.rect(surface, (20, 20, 20), metric_box, border_radius=12)
-                # Draw colored border
-                pygame.draw.rect(surface, severity_color, metric_box, 3, border_radius=12)
-
-                # Draw metric label (left side)
-                label_font = pygame.font.SysFont("Arial", 22)
-                label_text = label_font.render(friendly_name, True, theme.WHITE)
-                surface.blit(label_text, (content_start_x + 10, metric_y - 8))
-
-                # Draw metric value with unit (right side)
-                value_with_unit = f"{display_value}{unit}"
-                value_font = pygame.font.SysFont("Arial", 34, bold=True)
-                value_text = value_font.render(value_with_unit, True, severity_color)
-                value_rect = value_text.get_rect(right=content_start_x + metric_box_width - 30, centery=metric_y + 8)
-                surface.blit(value_text, value_rect)
-
-                metric_y += metric_spacing
-
-        # Draw stat buttons centered
-        if self.selected_device:
-            self._layout_stat_buttons()
-            for btn in self.stat_buttons.values():
-                btn.draw(surface)
+            surface.set_clip(old_clip)
+            self._draw_metric_scrollbar(surface)
         else:
-            placeholder_font = pygame.font.SysFont("Arial", 32)
+            placeholder_font = pygame.font.SysFont("Arial", 30)
             placeholder = placeholder_font.render("Select a device to view stats", True, theme.LIGHT_GRAY)
             placeholder_rect = placeholder.get_rect(center=(self.app.width // 2, self.app.height // 2))
             surface.blit(placeholder, placeholder_rect)
@@ -359,28 +414,151 @@ class MainScreen(BaseScreen):
         if self.popup:
             self.popup.draw(surface)
 
+    def _format_timestamp(self, timestamp):
+        if isinstance(timestamp, str) and "T" in timestamp:
+            date_part, time_part = timestamp.split("T", 1)
+            return f"{date_part} {time_part.split('.')[0]}"
+        return str(timestamp)
+
+    def _format_metric_value(self, metric_name, metric_value):
+        if metric_value is None:
+            return "N/A"
+
+        if metric_name == "uptime_seconds":
+            total = int(metric_value)
+            days = total // 86400
+            hours = (total % 86400) // 3600
+            mins = (total % 3600) // 60
+            if days > 0:
+                return f"{days}d {hours}h {mins}m"
+            return f"{hours}h {mins}m"
+
+        if metric_name in {"net_rx_kbps", "net_tx_kbps"}:
+            if metric_value >= 1000:
+                return f"{metric_value / 1000.0:.2f} Mbps"
+            return f"{metric_value:.0f} kbps"
+
+        if metric_name in {"mem_used_mb", "mem_total_mb"}:
+            return f"{int(metric_value)}{self.METRIC_UNITS.get(metric_name, '')}"
+
+        if metric_name == "cpu_load_1m":
+            return f"{metric_value:.2f}"
+
+        if isinstance(metric_value, float):
+            return f"{metric_value:.2f}{self.METRIC_UNITS.get(metric_name, '')}"
+
+        return f"{metric_value}{self.METRIC_UNITS.get(metric_name, '')}"
+
+    def _draw_metric_card(self, surface, rect, label, value, severity):
+        severity_color = theme.STATUS_COLORS.get(severity, theme.WHITE)
+        panel_bg = (22, 22, 22)
+
+        pygame.draw.rect(surface, panel_bg, rect, border_radius=12)
+        pygame.draw.rect(surface, severity_color, rect, 2, border_radius=12)
+
+        label_font = pygame.font.SysFont("Arial", 18)
+        value_font = pygame.font.SysFont("Arial", 28, bold=True)
+
+        label_text = label_font.render(label, True, theme.LIGHT_GRAY)
+        value_text = value_font.render(value, True, severity_color)
+
+        surface.blit(label_text, (rect.x + 12, rect.y + 10))
+        value_rect = value_text.get_rect(left=rect.x + 12, bottom=rect.bottom - 10)
+        surface.blit(value_text, value_rect)
+
+    def _clamp_metric_scroll(self):
+        if not self.metric_viewport_rect:
+            self.metric_scroll = 0
+            return
+
+        visible = self.metric_viewport_rect.height
+        min_scroll = min(0, visible - self.metric_content_height)
+
+        if self.metric_scroll > 0:
+            self.metric_scroll = 0
+        elif self.metric_scroll < min_scroll:
+            self.metric_scroll = min_scroll
+
+    def scroll_metrics(self, direction):
+        scroll_amount = 36
+        self.metric_scroll += direction * scroll_amount
+        self._clamp_metric_scroll()
+
+    def _draw_metric_scrollbar(self, surface):
+        if not self.metric_viewport_rect:
+            self.metric_scrollbar_track_rect = None
+            self.metric_scrollbar_thumb_rect = None
+            return
+
+        geometry = self._get_metric_scrollbar_geometry()
+        if geometry is None:
+            self.metric_scrollbar_track_rect = None
+            self.metric_scrollbar_thumb_rect = None
+            return
+
+        track_rect, thumb_rect = geometry
+        self.metric_scrollbar_track_rect = track_rect
+        self.metric_scrollbar_thumb_rect = thumb_rect
+
+        pygame.draw.rect(surface, (40, 40, 40), track_rect, border_radius=4)
+        pygame.draw.rect(surface, theme.BRIGHT_BLUE, thumb_rect, border_radius=4)
+
+    def _get_metric_scrollbar_geometry(self):
+        if not self.metric_viewport_rect:
+            return None
+        if self.metric_content_height <= self.metric_viewport_rect.height:
+            return None
+
+        track_w = 8
+        track_h = self.metric_viewport_rect.height
+        track_x = self.metric_viewport_rect.right - track_w - 4
+        track_y = self.metric_viewport_rect.y
+        track_rect = pygame.Rect(track_x, track_y, track_w, track_h)
+
+        visible_ratio = self.metric_viewport_rect.height / self.metric_content_height
+        thumb_h = max(28, int(track_h * visible_ratio))
+        max_offset = self.metric_content_height - self.metric_viewport_rect.height
+        current_offset = -self.metric_scroll
+        thumb_travel = max(1, track_h - thumb_h)
+        thumb_y = track_y + int((current_offset / max_offset) * thumb_travel)
+        thumb_rect = pygame.Rect(track_x, thumb_y, track_w, thumb_h)
+        return track_rect, thumb_rect
+
+    def _set_metric_scroll_from_thumb_top(self, thumb_top_y):
+        geometry = self._get_metric_scrollbar_geometry()
+        if geometry is None:
+            return
+
+        track_rect, thumb_rect = geometry
+        min_thumb_y = track_rect.y
+        max_thumb_y = track_rect.bottom - thumb_rect.height
+        clamped_thumb_y = max(min_thumb_y, min(thumb_top_y, max_thumb_y))
+
+        max_offset = self.metric_content_height - self.metric_viewport_rect.height
+        thumb_travel = max(1, track_rect.height - thumb_rect.height)
+        ratio = (clamped_thumb_y - min_thumb_y) / thumb_travel
+        self.metric_scroll = -int(ratio * max_offset)
+        self._clamp_metric_scroll()
+
     def scroll_devices(self, direction):
         scroll_amount = 20
         self.device_scroll += direction * scroll_amount
 
-        # Calculate spacing in between buttons
-        if len(self.device_buttons) > 1 :
+        if len(self.device_buttons) > 1:
             first = self.device_buttons[0].rect
             second = self.device_buttons[1].rect
             spacing = second.y - first.y - first.height
         else:
             spacing = 0
 
-        # Calculate total height of all device buttons
         total_height = 0
         for btn in self.device_buttons:
             total_height += btn.rect.height + spacing
-        
+
         visible_height = self.sidebar.height - 60
         max_scroll = 0
         min_scroll = min(0, visible_height - total_height)
 
-        # Clamp
         if self.device_scroll > max_scroll:
             self.device_scroll = max_scroll
         elif self.device_scroll < min_scroll:
@@ -413,25 +591,27 @@ class MainScreen(BaseScreen):
     def _build_stat_buttons(self):
         if not self.selected_device:
             return
-        
+
         stats = self.selected_device.get("stats", {})
-        
-        # Create the stat buttons based on keys in the stats dictionary
+        self.stat_buttons = {}
         for key, value in stats.items():
             self.stat_buttons[key] = Button(
-                rect=pygame.Rect(0,0,200,200),
+                rect=pygame.Rect(0, 0, 200, 200),
                 text=f"{key}: {value}"
             )
 
     def _layout_stat_buttons(self):
         if not self.selected_device:
             return
-        
+
         button_width = 200
         button_height = 60
         spacing = 40
 
         count = len(self.stat_buttons)
+        if count == 0:
+            return
+
         total_width = count * button_width + (count - 1) * spacing
         sidebar_width = self.sidebar.current_width
 
@@ -457,7 +637,6 @@ class MainScreen(BaseScreen):
         self._build_device_buttons()
 
     def _confirm_remove(self, device_name):
-        # Remove from backend by calling ui_control method
         self.app.ui_control.remove_node(device_name)
 
     def _build_remove_icons(self):
@@ -476,3 +655,4 @@ class MainScreen(BaseScreen):
             )
 
             self.remove_icons[btn.device["name"]] = remove_btn
+

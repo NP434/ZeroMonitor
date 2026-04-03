@@ -10,7 +10,9 @@ class Button:
                  bg_color=None, 
                  text_color=None, 
                  border_radius=None,
-                 align = "center"
+                 align = "center",
+                 border_color=None,
+                 border_thickness=0
     ):
         
         self.rect = pygame.Rect(rect)
@@ -21,6 +23,8 @@ class Button:
         self.text_color = text_color or theme.BUTTON_TEXT
         self.border_radius = border_radius or theme.BUTTON_RADIUS
         self.align = align
+        self.border_color = border_color
+        self.border_thickness = border_thickness
 
     def _fit_text(self, text, max_width):
         font = self.font
@@ -51,6 +55,15 @@ class Button:
 
         if self.bg_color:
             pygame.draw.rect(surface, self.bg_color, rect, border_radius=self.border_radius)
+
+        if self.border_thickness > 0 and self.border_color is not None:
+            pygame.draw.rect(
+                surface, 
+                self.border_color, 
+                self.rect, 
+                width=self.border_thickness, # 'width' tells Pygame to draw an outline, not fill it
+                border_radius=self.border_radius
+            )
 
         if self.image:
             img_rect = self.image.get_rect(center=rect.center)

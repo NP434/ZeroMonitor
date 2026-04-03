@@ -11,6 +11,7 @@ from ui.widgets.Slider import Slider
 from ui.widgets.Dropdown import DropDown
 from ui.widgets.ConfirmationPopup import ConfirmationPopup
 from ui.widgets.ToggleSwitch import ToggleSwitch
+from ui.widgets.Textbox import Textbox
 import ui.theme as theme
 import ui.utilities as utilities
 
@@ -405,6 +406,12 @@ class SettingsScreen(BaseScreen):
             self._apply_device()
 
     def _activate_custom_polling(self):
+        if not hasattr(self, "custom_textbox"):
+            self.custom_textbox = Textbox(
+                rect=pygame.Rect(400, 200, 120, 40),
+                text="Seconds",
+                title="Custom Polling"
+            )
         self.show_custom_textbox = True
 
     def _deactivate_custom_polling(self):

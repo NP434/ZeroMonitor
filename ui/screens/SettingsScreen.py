@@ -273,12 +273,14 @@ class SettingsScreen(BaseScreen):
                     has_polling_update = True
                     self.app.ui_control.change_polling_rate(backend_name, numeric)
                     device["polling_frequency"] = numeric
+                    self.app.bus.publish("SYNC_VAULT", {})
 
             if key == "polling_paused":
                 if widget.value != device.get("polling_paused", False):
                     has_polling_update = True
                     self.app.ui_control.pause_polling(backend_name, widget.value)
                     device["polling_paused"] = widget.value
+                    self.app.bus.publish("SYNC_VAULT", {})
 
         self.pending_polling_change = has_polling_update
 
@@ -311,6 +313,7 @@ class SettingsScreen(BaseScreen):
         self.pending_name_change = None
 
         self.app.ui_control.change_device_name(old_name, new_name)
+        self.app.bus.publish("SYNC_VAULT", {})
 
     def _revert_name_change(self):
         if not self.pending_name_change:

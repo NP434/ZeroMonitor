@@ -11,7 +11,7 @@ from ui.widgets.Slider import Slider
 from ui.widgets.Dropdown import DropDown
 from ui.widgets.ConfirmationPopup import ConfirmationPopup
 from ui.widgets.ToggleSwitch import ToggleSwitch
-from ui.widgets.Textbox import Textbox
+from ui.widgets.textbox import Textbox
 from ui.widgets.Numpad import Numpad
 from ui.widgets.Keyboard import Keyboard
 import ui.theme as theme

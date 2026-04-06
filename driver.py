@@ -1,6 +1,5 @@
 import logging
 import uuid
-
 from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 from json import load
@@ -23,7 +22,8 @@ logging.basicConfig(
 # Control module linking application service
 class Driver:
     """The driver owns the polling agent, and routes touchscreen control events to polling agent functions"""
-    def __init__(self, event_bus: EventBus):
+    def __init__(self, event_bus: EventBus, config):
+        self.config = config #FOR DEV MODE
         self.polling_agent = None
         self.metrics_queue = None
         self.control_executor = None
@@ -66,10 +66,19 @@ class Driver:
             "ADD_NODE",
             self.add_node
         )
-        # Will need to add many more based on which UI events need to occur
+
+        self.event_bus.subscribe(
+            "PAUSE_POLLING",
+             self._on_pause_polling
+        )
+
+        self.event_bus.subscribe(
+            "UPDATE_DEVICE_NAME",
+            self.update_device_name
+        )
 
         # Load targets and launch polling
-        nodes = load_targets()
+        nodes = load_targets(self.config)
         self.polling_agent.launch_nodes(nodes)
 
         self.running = True
@@ -83,18 +92,24 @@ class Driver:
         """Function to update the polling rate of a particular node"""
         host = payload["host"]
         new_rate = payload["poll_rate"]
-        with open("device_list.json", "r") as f:
+        with open(self.config.decrypted_list, "r") as f:
             data = load(f)
 
         for item in data.values():
             if item.get("name") == host:
                 item["polling_frequency"] = new_rate
 
-        with open("device_list.json", "w") as f:
+        with open(self.config.decrypted_list, "w") as f:
             import json
             json.dump(data, f, indent=4)
 
         self.reload_config()
+
+        # Acknowledge polling rate update
+        self.event_bus.publish("ACK_UPDATE_POLLING_RATE", {
+            "host": host,
+            "poll_rate": new_rate
+        })
 
     def _handle_remove_node(self, payload):
         """Handler function that formats data for remove_node"""
@@ -112,7 +127,7 @@ class Driver:
 
         # Open the device list
         try:
-            with open("device_list.json", "r") as f:
+            with open(self.config.decrypted_list, "r") as f:
                 data = load(f)
 
             removed_key = None
@@ -126,7 +141,7 @@ class Driver:
             if removed_key:
                 del data[removed_key]
 
-                with open("device_list.json", "w") as f:
+                with open(self.config.decrypted_list, "w") as f:
                     import json
                     json.dump(data, f, indent=4)
 
@@ -154,6 +169,8 @@ class Driver:
             "node": node_name,
             "success": success
         })
+
+        # ACK Pause Node
 
         # reconcile system
         self.reload_config()
@@ -186,7 +203,7 @@ class Driver:
             node_config.get("name")
         )
 
-        with open("device_list.json", "r") as f:
+        with open(self.config.decrypted_list, "r") as f:
             data = load(f)
 
         # Prevent duplicates by name
@@ -204,7 +221,7 @@ class Driver:
         # Create new entry for the new id
         data[new_id] = node_config
 
-        with open("device_list.json", "w") as f:
+        with open(self.config.decrypted_list, "w") as f:
             import json
             json.dump(data, f, indent=4)
 
@@ -234,34 +251,91 @@ class Driver:
         """Helper function that reloads configuration and reconciles nodes"""
         logging.info("[Driver] Reloading configuration")
 
-        nodes = load_targets()
+        nodes = load_targets(self.config)
         self.polling_agent.reconcile(nodes)
 
         # Publish device list to UI
-        with open ("device_list.json", "r") as f:
+        with open (self.config.decrypted_list, "r") as f:
             device_list = load(f)
         self.event_bus.publish("DEVICE_LIST_UPDATED", device_list)
 
+    def _on_pause_polling(self, payload):
+        device = payload["device"]
+        paused = payload["paused"]
+
+        # Update internal node state
+        node_entry = self.polling_agent.workers.get(device)
+        if node_entry:
+            node, future = node_entry
+            node.polling_paused = paused
+            logging.info(f"Polling for {device} paused = {paused}")
+        else:
+            logging.warning(f"Pause request for unknown device: {device}")
+
+        # Send ACK back to UI
+        self.event_bus.publish("ACK_POLLING_PAUSED", {
+            "device": device,
+            "paused": paused
+        })
+
+    def update_device_name(self, payload):
+        old_name = payload["old_name"]
+        new_name = payload["new_name"]
+        with open(self.config.decrypted_list, "r") as f:
+            data = load(f)
+
+        updated = False
+        for item in data.values():
+            if item.get("name") == old_name:
+                item["name"] = new_name
+                updated = True
+
+        if updated:
+            with open(self.config.decrypted_list, "w") as f:
+                import json
+                json.dump(data, f, indent=4)
+
+            self.reload_config()
+
+            self.event_bus.publish("ACK_UPDATE_DEVICE_NAME", {
+                "old_name": old_name,
+                "new_name": new_name
+            })
+
+
 
 # Load and initialize targets from device_list.json
-def load_targets() -> list:
+def load_targets(config) -> list:
     """Function to load and initialize targets from device_list.json"""
     nodes = []
-    with open("device_list.json", "r") as file:
-        data = load(file)
+
+    
+    try:
+        with open(config.decrypted_list, "r") as file:
+            data = load(file)
+    except FileNotFoundError:
+        logging.warning("[Driver] device_list.json not found (First Boot). Starting with 0 nodes.")
+        return [] # Return an empty list so the Driver doesn't crash!
+    
+
     items = data.values()
 
     for item in items:
         host = item.get("hostname")
         user = item.get("user")
         name = item.get("name")
-        os_type = item.get("operating_system")
+        os_type = (item.get("operating_system") or "").lower()
         poll_freq = int(item.get("polling_frequency", 5))
 
-        conn = PersistentConnection(host=host, user=user)
-        if(os_type.lower() == "linux"):
+        conn = PersistentConnection(
+            host=host, 
+            user=user,
+            key_path=config.ssh_key_ram # Feeds private key
+        )
+        
+        if(os_type == "linux"):
             provider = LinuxMetricsProvider(conn)
-        elif(os_type.lower() == "windows"):
+        elif(os_type == "windows"):
             provider = WindowsMetricsProvider(conn)
         else:
             # Gracefully handle error if OS is unsupported

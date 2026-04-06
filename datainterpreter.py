@@ -43,6 +43,7 @@ class DataInterpreter:
     def __init__(
         self,
         event_bus: EventBus,
+        config,
         json_filepath: str = "data/cache_data.json",
         smtp_server: Optional[str] = "smtp.gmail.com",
         smtp_port: Optional[int] = 465,
@@ -52,6 +53,8 @@ class DataInterpreter:
         email_to: Optional[str] = "weeboo187@gmail.com",
     ):
         self.event_bus = event_bus
+        self.config = config # For DEV MODE and Pathing
+
         self.thresholds = self.DEFAULT_THRESHOLDS.copy()
         self.device_thresholds = {}
 

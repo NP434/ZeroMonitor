@@ -9,6 +9,11 @@ DARK_GRAY = (25, 25, 25)
 GRAY = (60, 60, 60)
 LIGHT_GRAY = (120, 120, 120)
 LIGHTER_GRAY = (140, 140, 140)
+DARK_GRAY = (30, 30, 30)
+DARK_GREY = (30, 30, 30)
+GRAY = (60, 60, 60)
+LIGHT_GRAY = (100, 100, 100)
+LIGHT_GREY = (100, 100, 100)
 
 # Colors - Status & Severity
 BLUE = (0, 120, 255)

@@ -6,7 +6,6 @@ from ui.screens.BaseScreen import BaseScreen
 from ui.widgets.Button import Button
 from ui.widgets.SidebarPanel import SidebarPanel
 from ui.widgets.ConfirmationPopup import ConfirmationPopup
-from ui.widgets.SettingsPopup import SettingsPopup
 import ui.theme as theme
 
 
@@ -132,6 +131,19 @@ class MainScreen(BaseScreen):
         )
         self.remove_mode = False
         self.remove_icons = {}
+        
+        #Create Add Devic Button
+        add_width = 50
+        add_height = 50
+        add_x = self.sidebar.x + (self.sidebar.width_expanded - add_width) // 2
+        add_y = self.app.height - add_height - 70
+        self.add_button = Button(
+            rect=(add_x,add_y,add_width,add_height),
+            text="+",
+            image = None,
+            bg_color=theme.GREEN
+        )
+        self.add_mode = False
 
         # Initialize device list
         self.device_buttons = []
@@ -204,7 +216,7 @@ class MainScreen(BaseScreen):
 
             # Settings button clicked
             if self.settings_button.is_clicked(pos):
-                self.popup = SettingsPopup(self.app, self.settings_button.rect)
+                self.app.change_screen("settings")
                 return
 
             # Clock button clicked
@@ -222,6 +234,10 @@ class MainScreen(BaseScreen):
 
                 if self.remove_button.is_clicked(pos):
                     self._enter_remove_mode()
+
+                if self.add_button.is_clicked(pos):
+                    self.app.change_screen("add_device")
+                    
 
                 # When user selects remove icon, open confirmation window
                 if self.remove_mode:
@@ -405,6 +421,7 @@ class MainScreen(BaseScreen):
                 btn.rect = original_rect
 
             self.remove_button.draw(surface)
+            self.add_button.draw(surface)
 
             # Draw remove buttons
             if self.remove_mode:

@@ -63,6 +63,7 @@ class Node:
     stop_event: threading.Event | None = None
     # Used for exponential backoff logic
     fail_count: int = 0
+    polling_paused: bool = False
 
 
 # This class collects data from a Linux system and returns a SystemMetrics object
@@ -279,9 +280,11 @@ Write-Output \"NET_TX_BPS=$($tx.Sum)\"
 # This class maintains a persistent ssh session with targets to reduce polling overhead 
 class PersistentConnection:
     """Persistent connection to reduce SSH overhead"""
-    def __init__(self, host: str, user: str, connect_timeout=5, max_retries=5):
+    def __init__(self, host: str, user: str, key_path: str, connect_timeout=5, max_retries=5):
         self.host = host
         self.user = user
+        #Add encrypted key access
+        self.key_path = key_path
         self.connect_timeout = connect_timeout
         self.max_retries = max_retries
         self.conn: Optional[Connection] = None
@@ -297,7 +300,12 @@ class PersistentConnection:
                 self.conn = Connection(
                     host=self.host,
                     user=self.user,
-                    connect_timeout=self.connect_timeout
+                    connect_timeout=self.connect_timeout,
+                    connect_kwargs={ # Use our private key only
+                        "key_filename": self.key_path, 
+                        "look_for_keys": False,
+                        "allow_agent": False
+                    }
                 )
 
     def run(self, cmd, node_name=None, stop_event=None, **kwargs):
@@ -472,13 +480,17 @@ def run_node(node: Node, queue: Queue):
                 if stop_event.wait(wait_time):
                     logger.info("Worker stopped during wait")
                     return
-
             # If wait time is over, try to collect metrics
             try:
+                if node.polling_paused:
+                    next_run += interval
+                    continue
+
                 metrics = node.provider.collect(
                     node.name,
                     stop_event=stop_event
                 )
+                
                 logger.info("metrics collected successfully for %s", node.name)
                 # Put metrics in the queue
                 queue.put(MetricEvent(

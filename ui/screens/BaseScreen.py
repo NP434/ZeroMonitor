@@ -8,11 +8,12 @@ class BaseScreen:
     """
     def __init__(self, app):
         self.app = app
+        self.config = app.config # Pathing Logic for screens
         self.assets = {}
 
     def load_assets(self):
         """
-        Loads PNG assets into self.assets.
+        Loads PNG and WEBP assets into self.assets.
         Global assets are in /assets
         Screen-specific assets are in /assets/<screen>
         """
@@ -26,7 +27,7 @@ class BaseScreen:
             for filename in os.listdir("assets"):
                 path = os.path.join("assets", filename)
 
-                if os.path.isfile(path) and filename.lower().endswith(".png"):
+                if os.path.isfile(path) and filename.lower().endswith((".png", ".webp")):
                     image = pygame.image.load(path).convert_alpha()
                     self.assets[filename] = image
 
@@ -35,7 +36,7 @@ class BaseScreen:
             for filename in os.listdir(screen_folder):
                 path = os.path.join(screen_folder, filename)
 
-                if os.path.isfile(path) and filename.lower().endswith(".png"):
+                if os.path.isfile(path) and filename.lower().endswith((".png", ".webp")):
                     image = pygame.image.load(path).convert_alpha()
                     self.assets[filename] = image
 

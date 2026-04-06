@@ -33,6 +33,7 @@ htmlcov/
 .coverage.*
 .cache
 pytest_cache/
+__pycache__/
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints
@@ -48,4 +49,13 @@ Thumbs.db
 # Pygame / runtime caches
 *.log
 *.tmp
+Initialization/cert_gen.sh
+Initialization/cert_gen.sh
+Pairing/certs/server.crt
+Pairing/certs/server.key
 data_output.json
+
+# dev_mode artifacts
+dev_vault/
+*.log
+logs/

@@ -80,11 +80,6 @@ class AddScreen(BaseScreen):
         self.token = None
         self.popup = None
 
-    def update(self):
-        if self.active_textbox and self._events:
-            self.keyboard.update(self._events)
-            self._events.clear()
-
         if self.token_to_be_disp:
                 self.popup = DisplayPopup(
                     app=self.app,
@@ -194,7 +189,6 @@ class AddScreen(BaseScreen):
                 if self.active_textbox:
                     self.active_textbox.activate(False)
                     self.active_textbox = None
-                self.keyboard.disable()
 
                 
             if self.token_to_be_disp:

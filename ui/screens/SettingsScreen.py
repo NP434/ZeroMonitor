@@ -182,6 +182,11 @@ class SettingsScreen(BaseScreen):
     def _build_settings_widgets(self):
         """Rebuild right-panel widgets for the currently selected device."""
         self.device_settings_widgets = []
+
+        self.show_custom_textbox = False
+        self.show_numpad = False
+        self.custom_error_message = None
+
         if not self.selected_device:
             return
 
@@ -506,20 +511,18 @@ class SettingsScreen(BaseScreen):
             dropdown_rect = pygame.Rect(400, 200, 200, 40)
 
         # Create textbox if needed
-        if not hasattr(self, "custom_textbox"):
-            self.custom_textbox = Textbox(
-                rect=pygame.Rect(dropdown_rect.right + 40, dropdown_rect.y, 150, 40),
-                text="",
-                title="Custom Polling"
-            )
+        self.custom_textbox = Textbox(
+            rect=pygame.Rect(dropdown_rect.right + 40, dropdown_rect.y, 150, 40),
+            text="",
+            title="Custom Polling"
+        )
 
         # Create numpad if needed
-        if not hasattr(self, "numpad"):
-            self.numpad = Numpad(
-                x=self.custom_textbox.rect.right + 20,
-                y=self.custom_textbox.rect.y,
-                callback=self._on_numpad_key
-            )
+        self.numpad = Numpad(
+            x=self.custom_textbox.rect.right + 20,
+            y=self.custom_textbox.rect.y,
+            callback=self._on_numpad_key
+        )
 
         self.show_custom_textbox = True
         self.show_numpad = False 
@@ -600,9 +603,6 @@ class SettingsScreen(BaseScreen):
         if self.confirm_popup:
             self.confirm_popup.draw(surface)
 
-        if self.show_custom_textbox:
-            self.custom_textbox.draw(surface)
-
     def _draw_header(self, surface):
         pygame.draw.rect(surface, theme.DARK_GRAY,
                          (0, 0, self.app.width, HEADER_H))
@@ -651,6 +651,9 @@ class SettingsScreen(BaseScreen):
                 pygame.draw.rect(surface, theme.YELLOW, r,
                                  border_radius=20, width=2)
             btn.draw(surface, override_rect=r)
+
+        if self.show_custom_textbox:
+            self.custom_textbox.draw(surface)
 
         self.device_apply_btn.draw(surface)
 

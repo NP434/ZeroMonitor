@@ -136,6 +136,14 @@ class SettingsScreen(BaseScreen):
             border_radius=10,
         )
 
+        toggle_y = slider_y + 110
+        self.temp_unit_toggle = ToggleSwitch(
+            self.app,
+            rect=(150, toggle_y, 60, 32),
+            default=False  # False = Celsius, True = Fahrenheit
+        )
+        self.temp_unit_label = "°C / °F"
+
     # ══════════════════════════════════════════════════════════════════════
     # System tab
     # ══════════════════════════════════════════════════════════════════════
@@ -145,8 +153,13 @@ class SettingsScreen(BaseScreen):
         self.system_unsaved = (round(value) != round(self._saved_brightness))
         self.app.ui_control.preview_brightness(value)
 
+    def _on_temp_unit_change(self, value):
+        self.app.temp_unit = "F" if value else "C"
+        self.system_unsaved = True
+
     def _apply_system(self):
         self._saved_brightness = self.brightness_value
+        self._saved_temp_unit = self.app.temp_unit
         self.system_unsaved = False
         self.app.ui_control.set_brightness(self.brightness_value)
 
@@ -391,6 +404,8 @@ class SettingsScreen(BaseScreen):
         if self.active_tab == TAB_SYSTEM:
             self.brightness_value = self._saved_brightness
             self.brightness_slider.value = self._saved_brightness
+            self.app.temp_unit = self._saved_temp_unit
+            self.temp_unit_toggle.value = (self._saved_temp_unit == "F")
             self.system_unsaved = False
         else:
             self._revert_name_change()
@@ -416,6 +431,13 @@ class SettingsScreen(BaseScreen):
         # Slider needs all event types (drag / motion), not just clicks
         if self.active_tab == TAB_SYSTEM:
             self.brightness_slider.handle_event(event)
+
+            result = self.temp_unit_toggle.handle_event(event)
+            if result is not None:
+                self._on_temp_unit_change(result)
+            if self.system_unsaved and self.system_apply_btn.is_clicked(event.pos):
+                self._apply_system()
+            return
 
         pos = utilities.get_event_pos(event, self.app)
         if pos is None:
@@ -631,6 +653,13 @@ class SettingsScreen(BaseScreen):
 
 
         self.brightness_slider.draw(surface)
+
+        # Temperature unit
+        lbl = theme.FONT_SMALL.render("Temperature Unit  °C", True, theme.LIGHT_GRAY)
+        surface.blit(lbl, (self.app.width // 2 - 30, self.temp_unit_toggle.rect.y - 24))
+        self.temp_unit_toggle.draw(surface)
+        f_lbl = theme.FONT_SMALL.render("°F", True, theme.LIGHT_GRAY)
+        surface.blit(f_lbl, (self.app.width // 2 + 40, self.temp_unit_toggle.rect.y))
 
         # Apply button: green when there's something to save, dark grey otherwise
         self.system_apply_btn.bg_color = (theme.GREEN if self.system_unsaved

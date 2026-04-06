@@ -1,150 +1,167 @@
 import pygame
-import subprocess
-from pygame_vkeyboard import *
-from ui.screens.BaseScreen import BaseScreen
+import logging
 from ui.widgets.Button import Button
-from ui.widgets.textbox import Textbox
+from ui.widgets.Keyboard import Keyboard
 import ui.theme as theme
 import ui.utilities as utilities
 
-class WiFiScreen(BaseScreen):
+class WiFiScreen:
     def __init__(self, app):
-        super().__init__(app)
+        self.app = app
+        self.logger = logging.getLogger("WiFi_UI")
+
+        #Connection Setup
+        self.is_connecting = False
+        self.error_message = ""
+        self.app.bus.subscribe("WIFI_RESULT", self._handle_wifi_result)
         
-        # Standard Buttons
-        self.back_button = Button(
-            rect=(0, 0, 100, 60),
-            text="Back",
-            bg_color=theme.RED
-        )
-        self.join_button = Button(
-            rect=(self.app.width - 100, 0, 100, 60),
-            text="Join",
-            bg_color=theme.GREEN
-        )
-
-        # Textboxes
-        self.SSIDBox = Textbox(
-            rect=(self.app.width // 2 - 150, 100, 300, 50),
-            text="Enter SSID",
-            title="Network Name"
-        )
-        self.PasswordBox = Textbox(
-            rect=(self.app.width // 2 - 150, 180, 300, 50),
-            text="Enter Password",
-            title="WiFi Password"
-        )
-
-        # Keyboard Setup from Noah
-        self.keyboard_height = 600
-        self.keyboard_surface = pygame.Surface((self.app.width, self.keyboard_height))
-        self.keyboard_surface.set_colorkey((0, 0, 0))
-        self.keyboard_layout = VKeyboardLayout(VKeyboardLayout.QWERTY)
-        self.keyboard = VKeyboard(
-            surface=self.keyboard_surface,
-            text_consumer=None,
-            main_layout=self.keyboard_layout,
-            renderer=VKeyboardRenderer.DEFAULT
-        )
-        self.keyboard.disable()
+        # State variables
+        self.ssid = ""
+        self.password = ""
+        self.active_field = "ssid" # Defaults to typing in the SSID box
         
-        self.keyboard_rect = pygame.Rect(
-            0,
-            self.app.height - 600,
-            self.app.width,
-            600
+        # Layout metrics
+        self.font = pygame.font.SysFont(None, 40)
+        self.title_font = pygame.font.SysFont(None, 60)
+        
+        # --- UPDATE WIDGETS TO INCLUDE BORDERS ---
+        # The clickable areas for the text boxes remain, but we define their style here.
+        self.ssid_rect = pygame.Rect(200, 100, 624, 50)
+        self.pass_rect = pygame.Rect(200, 180, 624, 50)
+        
+        # The Connect Button
+        self.connect_btn = Button(
+            rect=pygame.Rect(400, 250, 224, 50),
+            text="Connect",
+            bg_color=theme.GREEN if hasattr(theme, 'GREEN') else (0, 200, 0),
+            text_color=theme.WHITE,
+            border_radius=5,
+            # --- ADD OUTLINE ---
+            border_color=theme.WHITE,
+            border_thickness=2
         )
+        
+        # (Keyboard setup is the same)
+        self.keyboard = Keyboard(x=50, y=320, width=924, callback=self.on_key_press)
 
-        # State Management
-        self._events = []
-        self.active_textbox = None
-        self.status_msg = "Connect to WiFi"
+    def on_key_press(self, key):
+        """Callback function triggered by the Keyboard widget"""
+        # Determine which text variable we are modifying
+        current_text = self.ssid if self.active_field == "ssid" else self.password
+        
+        if key == "Back":
+            current_text = current_text[:-1]
+        elif key == "Enter":
+            self._attempt_connection()
+            return
+        else:
+            current_text += key
+            
+        # Save the modified text back to the correct variable
+        if self.active_field == "ssid":
+            self.ssid = current_text
+        else:
+            self.password = current_text
 
-    def update(self):
-        """Processes the event queue for the keyboard"""
-        if self.active_textbox and self._events:
-            self.keyboard.update(self._events)
-            self._events.clear()
+    def _attempt_connection(self):
+        """Sends the request and puts the UI into a waiting state."""
+        if self.is_connecting:
+            return # Prevent multiple clicks while already trying
+            
+        self.is_connecting = True
+        self.error_message = "" # Clear old errors
+        
+        self.logger.info(f"Initiating connection to: {self.ssid}")
+        self.app.bus.publish("WIFI_CONNECT_REQ", {
+            "ssid": self.ssid, 
+            "password": self.password
+        })
+
+    def _handle_wifi_result(self, data):
+        """Called automatically when the NetworkManager finishes its attempt."""
+        success = data.get("success")
+        error_msg = data.get("error", "Unknown Connection Error")
+        
+        self.is_connecting = False # Stop the 'loading' state
+        
+        if success:
+            self.logger.info("WiFi Connection Successful. Routing to Passcode Setup.")
+            self.app.change_screen("init_passcode")
+        else:
+            self.logger.error(f"WiFi Connection Failed: {error_msg}")
+            self.error_message = error_msg
 
     def handle_event(self, event):
-        # Capture all events into the queue
-        self._events.append(event)
-
-        if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
-            if event.type == pygame.FINGERDOWN:
-                pos = (int(event.x * self.app.width), int(event.y * self.app.height))
-            else:
-                pos = event.pos
-
-            # UI Buttons
-            if self.back_button.is_clicked(pos):
-                self.app.change_screen("main")
+        # Use your utility to safely get the position
+        pos = utilities.get_event_pos(event, self.app)
+        if pos is None:
+            return
             
-            if self.join_button.is_clicked(pos):
-                self.attempt_connection()
+        # Block double-entries
+        if event.type not in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
+            return
+            
+        # Process the click
+        if self.keyboard.handle_event(pos):
+            return 
+            
+        if self.ssid_rect.collidepoint(pos):
+            self.active_field = "ssid"
+        elif self.pass_rect.collidepoint(pos):
+            self.active_field = "password"
+            
+        if self.connect_btn.is_clicked(pos):
+            self._attempt_connection()
 
-            if self.SSIDBox.is_clicked(pos):
-                if self.active_textbox is not None:
-                    self.active_textbox.activate(False)
-                self.SSIDBox.activate(True)
-                self.active_textbox = self.SSIDBox
-                self.keyboard.text_consumer = self.SSIDBox.consume
-                self.keyboard.set_text("")
-                self.keyboard.enable()
+    def update(self):
+        pass
 
-            elif self.PasswordBox.is_clicked(pos):
-                if self.active_textbox is not None:
-                    self.active_textbox.activate(False)
-                self.PasswordBox.activate(True)
-                self.active_textbox = self.PasswordBox
-                self.keyboard.text_consumer = self.PasswordBox.consume
-                self.keyboard.set_text("")
-                self.keyboard.enable()
-
-            elif self.keyboard_rect.collidepoint(pos) and self.active_textbox:
-                pass
-
-            else:
-                if self.active_textbox:
-                    self.active_textbox.activate(False)
-                    self.active_textbox = None
-                self.keyboard.disable()
-
-    def attempt_connection(self):
-        self.status_msg = "Attempting Connection..."
-        cmd = ["nmcli", "device", "wifi", "connect", self.SSIDBox.txt, "password", self.PasswordBox.txt]
+    def draw(self, surface):
+        surface.fill(theme.BACKGROUND if hasattr(theme, 'BACKGROUND') else (30, 30, 30))
         
-        try:
-            # nmcli
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-            if result.returncode == 0:
-                self.app.change_screen("init")
-            else:
-                self.status_msg = "Connection Failed"
-        except:
-            self.status_msg = "System Timeout"
+        # Draw Title
+        title_surf = self.title_font.render("Connect to Wi-Fi", True, theme.WHITE)
+        surface.blit(title_surf, (self.app.width//2 - title_surf.get_width()//2, 30))
+        
+        # --- UPDATE SSID BOX DRAWING ---
+        # Make the border color of the input box dynamic based on activity
+        ssid_border_color = theme.WHITE if self.active_field == "ssid" else theme.DARK_GREY
+        
+        # If your Button widget handles drawing rects, you might use it here.
+        # Assuming we are drawing the input box as a primitive rect for simplicity:
+        pygame.draw.rect(surface, theme.DARK_GREY, self.ssid_rect, border_radius=5) # Background
+        pygame.draw.rect(surface, ssid_border_color, self.ssid_rect, width=3, border_radius=5) # Highlight Border
+        
+        ssid_text = self.font.render(f"SSID: {self.ssid}", True, theme.WHITE)
+        surface.blit(ssid_text, (self.ssid_rect.x + 10, self.ssid_rect.y + 10))
+        
+        # --- UPDATE PASSWORD BOX DRAWING ---
+        pass_border_color = theme.WHITE if self.active_field == "password" else theme.DARK_GREY
+        
+        pygame.draw.rect(surface, theme.DARK_GREY, self.pass_rect, border_radius=5)
+        pygame.draw.rect(surface, pass_border_color, self.pass_rect, width=3, border_radius=5)
+        
+        masked_pass = "*" * len(self.password)
+        pass_text = self.font.render(f"Pass: {masked_pass}", True, theme.WHITE)
+        surface.blit(pass_text, (self.pass_rect.x + 10, self.pass_rect.y + 10))
+        
+        # Draw Connect Button
+        self.connect_btn.draw(surface)
+        
+        # Draw Keyboard
+        self.keyboard.draw(surface)
 
-    def draw(self, screen):
-        screen.fill(theme.BLACK)
-
-        # Title
-        title = theme.DEFAULT_FONT.render("WiFi Setup", True, theme.WHITE)
-        screen.blit(title, (self.app.width // 2 - title.get_width() // 2, 10))
-
-        # Status
-        status_surf = theme.SMALL_FONT.render(self.status_msg, True, theme.RED)
-        screen.blit(status_surf, (self.app.width // 2 - status_surf.get_width() // 2, 65))
-
-        # Widgets
-        self.back_button.draw(screen)
-        self.join_button.draw(screen)
-        self.SSIDBox.draw(screen)
-        self.PasswordBox.draw(screen)
-
-        # Keyboard Rendering
-        if self.active_textbox:
-            screen.blit(
-                self.keyboard_surface,
-                (0, self.app.height - self.keyboard_height)
-            )
-            self.keyboard.draw()
+        # --- DRAW ERROR MESSAGE ---
+        if self.error_message:
+            # Use FONT_SMALL from your theme
+            error_surf = theme.FONT_SMALL.render(self.error_message, True, theme.RED)
+            # Position it right under the password input box
+            surface.blit(error_surf, (self.pass_rect.x, self.pass_rect.bottom + 5))
+            
+        # --- DRAW LOADING INDICATOR ---
+        if self.is_connecting:
+            # Use FONT_SMALL or FONT_MEDIUM based on preference
+            loading_surf = theme.FONT_SMALL.render("Connecting... Please wait.", True, theme.WHITE)
+            # Center it roughly above the Connect button
+            text_x = self.connect_btn.rect.centerx - (loading_surf.get_width() // 2)
+            surface.blit(loading_surf, (text_x, self.connect_btn.rect.top - 40))

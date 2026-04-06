@@ -3,6 +3,7 @@
 import logging
 import os
 
+
 class ControlUI:
     """Framework for the UI class that will drive the UI and publish events to the driver based on button presses"""
     def __init__(self, event_bus, config):
@@ -59,6 +60,12 @@ class ControlUI:
         self.bus.publish("PAUSE_POLLING", {
             "device": device_name,
             "paused": paused
+        })
+
+    def change_device_name(self, old_name, new_name):
+        self.bus.publish("UPDATE_DEVICE_NAME", {
+            "old_name": old_name,
+            "new_name": new_name
         })
 
     def is_raspberry_pi(self):

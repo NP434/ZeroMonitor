@@ -10,11 +10,11 @@ class Config:
         
         if self.dev_mode:
             # dev_mode argparse repos
-            self.secrets_dir = os.path.join(self.base_dir, "dev_vault", "secrets")
+            self.storage_dir = os.path.join(self.base_dir, "dev_vault", "storage")
             self.ram_dir = os.path.join(self.base_dir, "dev_vault", "ram")
         else:
             # Standard Raspberry Pi paths
-            self.storage_dir = "/home/admin/zero_monitor_storage"
+            self.storage_dir = "/home/zero_monitor_storage"
             self.ram_dir = "/run/zero_monitor_decrypted"
 
         # Specific File Paths
@@ -26,6 +26,8 @@ class Config:
         self.pairing_info = os.path.join(self.storage_dir, "pairing_info.json")
         self.server_cert = os.path.join(self.storage_dir, "server.crt")
         self.server_key = os.path.join(self.storage_dir, "server.key")
+        self.cache_file = os.path.join(self.storage_dir, "cache_data.json")
+        self.email_settings = os.path.join(self.storage_dir, "email_settings.json")
 
         # Ensure directories exist
         os.makedirs(self.storage_dir, exist_ok=True)

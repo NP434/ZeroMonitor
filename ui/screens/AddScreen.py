@@ -1,10 +1,10 @@
 import pygame
-from pygame_vkeyboard import *
 from ui.screens.BaseScreen import BaseScreen
 from ui.widgets.Button import Button
 from ui.widgets.textbox import Textbox
 import ui.theme as theme
 from ui.widgets.DisplayPopup import DisplayPopup
+from ui.widgets.Keyboard import Keyboard
 
 
 class AddScreen(BaseScreen):
@@ -28,58 +28,49 @@ class AddScreen(BaseScreen):
         )
 
         self.Endpoint_button = Button(
-            rect = (app.width / 4, 100, 100,60),
+            rect = (app.width / 2 - 100, 125, 100,60),
             text="Endpoint",
             bg_color=theme.BLUE
         )
         self.Password_button = Button(
-            rect = ( (3 * app.width / 4 ) , 100, 100,60),
-            text="Password Auth",
+            rect = ( app.width / 2, 125, 100,60),
+            text="Password",
             bg_color=theme.GRAY
         )
         self.mode = "Endpoint"
 
         self.UserNameBox = Textbox(
-            rect=(382, 200, 300, 50),
+            rect=(382, 225, 300, 50),
             text="Enter User Name",
             title="User Name"
         )
         self.HostNameBox = Textbox(
-            rect=(41, 200, 300, 50),
+            rect=(41, 225, 300, 50),
             text="Enter Host Name",
             title="Hostname"
         )
         self.DeviceNameBox = Textbox(
-            rect=(711, 200, 300, 50),
+            rect=(711, 225, 300, 50),
             text="Enter Device Name",
             title="Device Name"
         )
         self.passwordBox = Textbox(
-            rect=(711, 200, 300, 50),
+            rect=(711, 225, 300, 50),
             text="Enter Device Password",
             title="Password"
         )
-        self.keyboard_height=600
-        self.keyboard_surface = pygame.Surface((self.app.width, self.keyboard_height))
-        self.keyboard_surface.set_colorkey((0, 0, 0))  # optional, for transparency
-        self.keyboard_layout = VKeyboardLayout(VKeyboardLayout.QWERTY)
-        self.keyboard = VKeyboard(surface=self.keyboard_surface,
-                                  text_consumer=None,
-                                  main_layout=self.keyboard_layout,
-                                  renderer=VKeyboardRenderer.DEFAULT
-                                 )
-        self.keyboard.disable()
+        self.keyboard_height = 300
+
+        self.keyboard = Keyboard(
+            x=0,
+            y=self.app.height - self.keyboard_height,
+            width=self.app.width,
+            callback=self._on_key_pressed
+        )
         self._events = []
         self.screen_filled = False
         self.active_textbox = None
         # assuming keyboard uses bottom 250px of the screen
-        
-        self.keyboard_rect = pygame.Rect(
-                                        0,                           # x
-                                        self.app.height - 600,       # y
-                                        self.app.width,              # width
-                                        600                          # height
-                                        )
         self.popup = None
         self.token_to_be_disp = False
         self.token = None
@@ -103,6 +94,19 @@ class AddScreen(BaseScreen):
         if not self.token_to_be_disp:
             self.popup = None
     
+    def _on_key_pressed(self, key):
+        if not self.active_textbox:
+            return
+
+        if key == "Back":
+            self.active_textbox.txt = self.active_textbox.txt[:-1]
+
+        elif key == "Enter":
+            self.active_textbox.activate(False)
+            self.active_textbox = None
+
+        else:
+            self.active_textbox.txt += key
     
     def handle_event(self,event):
         self._events.append(event)
@@ -117,6 +121,14 @@ class AddScreen(BaseScreen):
                 pos = event.pos
 
             if self.back_button.is_clicked(pos):
+                self.active_textbox = None
+                self.popup = None
+                self.token_to_be_disp = None
+                self.DeviceNameBox.txt = ""
+                self.HostNameBox.txt = ""
+                self.UserNameBox.txt = ""
+                self.Password_button.txt = ""
+        
                 self.app.change_screen("main")
             if self.done_button.is_clicked(pos):
                 node_config = {
@@ -149,16 +161,14 @@ class AddScreen(BaseScreen):
                     self.DeviceNameBox.activate(True)
                     self.active_textbox = self.DeviceNameBox
                     self.keyboard.text_consumer = self.DeviceNameBox.consume
-                    self.keyboard.set_text("")
-                    self.keyboard.enable()
+                    
                 else:
                     if self.active_textbox is not None:
                         self.active_textbox.activate(False)
                     self.passwordBox.activate(True)
                     self.active_textbox = self.passwordBox
                     self.keyboard.text_consumer = self.passwordBox.consume
-                    self.keyboard.set_text("")
-                    self.keyboard.enable()
+                    
 
             elif self.UserNameBox.is_clicked(pos):
                 if self.active_textbox is not None:
@@ -166,8 +176,7 @@ class AddScreen(BaseScreen):
                 self.active_textbox = self.UserNameBox
                 self.keyboard.text_consumer = self.UserNameBox.consume
                 self.UserNameBox.activate(True)
-                self.keyboard.set_text("")  
-                self.keyboard.enable()
+                
 
             elif self.HostNameBox.is_clicked(pos):
                 if self.active_textbox is not None:
@@ -175,11 +184,11 @@ class AddScreen(BaseScreen):
                 self.HostNameBox.activate(True)
                 self.active_textbox = self.HostNameBox
                 self.keyboard.text_consumer = self.HostNameBox.consume
-                self.keyboard.set_text("")
-                self.keyboard.enable()
+                
 
-            elif self.keyboard_rect.collidepoint(pos) and self.active_textbox:
-                pass
+            elif self.active_textbox:
+                if self.keyboard.handle_event(pos):
+                    return
 
             else:
                 if self.active_textbox:
@@ -188,14 +197,23 @@ class AddScreen(BaseScreen):
                 self.keyboard.disable()
 
                 
+            if self.token_to_be_disp:
+                self.popup = DisplayPopup(
+                    app=self.app,
+                    message=f"Pairing Token: {self.token}",
+                    on_confirm=self.end_token_disp
+                )
+                
 
 
     def draw(self,screen):
         #if not self.screen_filled or not self.active_textbox:
         screen.fill(theme.BLACK)
 
-
-        title = theme.DEFAULT_FONT.render("Add Device", True, theme.WHITE)
+        top_bar_height = 90
+        pygame.draw.rect(screen, theme.DARK_GRAY, (0, 0, self.app.width, 70))
+        pygame.draw.line(screen, theme.BLUE, (0, 70), (self.app.width, 70), 2)
+        title = theme.DEFAULT_FONT.render("Add Device", True, theme.BRIGHT_BLUE)
         screen.blit(
             title,
             (self.app.width // 2 - title.get_width() // 2, 0)
@@ -204,6 +222,9 @@ class AddScreen(BaseScreen):
         self.done_button.draw(screen)
         self.Endpoint_button.draw(screen)
         self.Password_button.draw(screen)
+        
+        mode = theme.DEFAULT_FONT.render("Pairing Mode", True, theme.WHITE)
+        screen.blit(mode, (self.app.width / 2 - mode.get_width() / 2, 80))
 
         if self.mode == 'Endpoint':
             self.DeviceNameBox.draw(screen)
@@ -217,11 +238,7 @@ class AddScreen(BaseScreen):
         
 
         if self.active_textbox:
-            screen.blit(
-            self.keyboard_surface,
-            (0, self.app.height - self.keyboard_height)
-        )
-        self.keyboard.draw()
+            self.keyboard.draw(screen)
 
         #Draw Pairing Token Popup
         if self.token_to_be_disp and self.popup:

@@ -12,9 +12,9 @@ class Textbox:
         self.rect = pygame.Rect(rect)
         self.txt = ""
         self.placeholder = text
-        self.color_inactive = ('black')
+        self.color_inactive = theme.DARK_GRAY
         self.border_radius = 3
-        self.color_active = ('gray')
+        self.color_active = theme.GRAY
         self.color = self.color_inactive
         self.active = False
         self.title = title
@@ -26,7 +26,7 @@ class Textbox:
 
     def consume(self, text:str):
         print("current text: %s" % text)
-        self.txt = text
+        self.txt += text
     
     def activate(self, active):
         self.active = active

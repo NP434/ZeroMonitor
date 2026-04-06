@@ -166,7 +166,9 @@ class DisplayUI:
                 old_name, new_name = screen.pending_name_change
                 screen.pending_polling_change = False
                 screen._commit_name_change(old_name, new_name)
-
+            
+            screen.pending_polling_change = False
+            screen.unsaved_changes = False
             screen._build_device_list()
             screen._build_settings_widgets()
 

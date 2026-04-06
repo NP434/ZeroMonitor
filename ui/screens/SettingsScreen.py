@@ -551,7 +551,6 @@ class SettingsScreen(BaseScreen):
                 self.pending_name_change = (old_name, new_name)
                 self.temp_name = new_name
                 self.unsaved_changes = True
-                self.app.ui_control.change_device_name(old_name, new_name)
             self._end_name_edit()
         else:
             self.temp_name += key

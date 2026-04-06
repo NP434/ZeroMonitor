@@ -153,20 +153,24 @@ class DisplayUI:
         host = payload["host"]
         rate = payload["poll_rate"]
 
-        # Update local device data
-        for d in self.devices:
-            if d["name"] == host:
-                d["polling_frequency"] = rate
-
-        # Notify current screen
         if isinstance(self.current_screen, SettingsScreen):
             screen = self.current_screen
-            # If a name change was pending, now commit it after polling ack
+
+            # Commit name change FIRST, before any rebuilds
             if getattr(screen, "pending_name_change", None):
                 old_name, new_name = screen.pending_name_change
                 screen.pending_polling_change = False
                 screen._commit_name_change(old_name, new_name)
-            
+                screen.unsaved_changes = False
+                return
+
+        # No pending name change — safe to update and rebuild now
+        for d in self.devices:
+            if d["name"] == host:
+                d["polling_frequency"] = rate
+
+        if isinstance(self.current_screen, SettingsScreen):
+            screen = self.current_screen
             screen.pending_polling_change = False
             screen.unsaved_changes = False
             screen._build_device_list()
@@ -175,7 +179,6 @@ class DisplayUI:
         if isinstance(self.current_screen, MainScreen):
             self.current_screen._build_device_buttons()
 
-        # Also update main screen object if not active
         main_screen = self.screens.get("main")
         if main_screen and not isinstance(self.current_screen, MainScreen):
             main_screen._build_device_buttons()

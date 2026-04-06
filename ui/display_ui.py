@@ -13,8 +13,6 @@ import os
 import subprocess
 from ui.screens.MainScreen import MainScreen
 from ui.screens.SystemDashboardScreen import SystemDashboardScreen
-from ui.screens.SystemSettingsScreen import SystemSettingsScreen
-from ui.screens.DeviceSettingsScreen import DeviceSettingsScreen
 from ui.screens.SettingsScreen import SettingsScreen
 from ui.screens.AddScreen import AddScreen
 from ui.screens.WiFiScreen import WiFiScreen
@@ -109,8 +107,9 @@ class DisplayUI:
             "email_setup": EmailScreen(self)
         }
 
-        # Starting on the system dashboard screen
-        self.current_screen = self.screens["dashboard"]
+        # Logic for starting screen, DO NOT CHANGE
+        start_key = self._boot_router()
+        self.current_screen = self.screens[start_key]
         self._running = False
 
 

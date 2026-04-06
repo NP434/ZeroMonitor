@@ -53,17 +53,23 @@ class ConfirmationPopup:
         if not self.open:
             return
 
-        # Dim background 
         utilities.dim_background(self.app, surface)
 
-        # Background box
         pygame.draw.rect(surface, theme.GRAY, self.rect, border_radius=10)
         pygame.draw.rect(surface, theme.WHITE, self.rect, width=2, border_radius=10)
 
-        # Text
-        msg = theme.DEFAULT_FONT.render(self.message, True, theme.WHITE)
-        surface.blit(msg, (self.rect.centerx - msg.get_width() // 2, self.rect.y + 20))
+        # Autofit text to box width
+        max_text_width = self.rect.width - 40  # 20px padding each side
+        font_size = 32
+        font = pygame.font.SysFont("Arial", font_size)
+        msg_surf = font.render(self.message, True, theme.WHITE)
 
-        # Yes/No Buttons
+        while msg_surf.get_width() > max_text_width and font_size > 8:
+            font_size -= 1
+            font = pygame.font.SysFont("Arial", font_size)
+            msg_surf = font.render(self.message, True, theme.WHITE)
+
+        surface.blit(msg_surf, (self.rect.centerx - msg_surf.get_width() // 2, self.rect.y + 20))
+
         self.confirm_yes.draw(surface)
         self.confirm_no.draw(surface)

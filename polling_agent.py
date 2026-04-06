@@ -25,6 +25,7 @@ class SystemMetrics:
     net_rx_kbps: Optional[float]
     net_tx_kbps: Optional[float]
 
+
 # This object is passed to the metrics queue and includes system metrics
 @dataclass
 class MetricEvent:
@@ -37,6 +38,7 @@ class MetricEvent:
     # Timestamp
     timestamp: str
 
+
 # Abstract base class for all operating systems to be implmeneted
 class MetricsProvider(ABC):
     def __init__(self, conn: Connection):
@@ -46,6 +48,7 @@ class MetricsProvider(ABC):
     def collect(self, node_name: str, stop_event=None) -> SystemMetrics:
         """Abstract method to be implemented by subclasses"""
         pass
+
 
 # This class represents a single target device
 @dataclass
@@ -60,6 +63,7 @@ class Node:
     stop_event: threading.Event | None = None
     # Used for exponential backoff logic
     fail_count: int = 0
+
 
 # This class collects data from a Linux system and returns a SystemMetrics object
 class LinuxMetricsProvider(MetricsProvider):

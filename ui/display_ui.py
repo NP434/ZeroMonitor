@@ -10,6 +10,7 @@ import pygame
 import json
 import sys
 from ui.screens.MainScreen import MainScreen
+from ui.screens.SystemDashboardScreen import SystemDashboardScreen
 from ui.screens.SystemSettingsScreen import SystemSettingsScreen
 from ui.screens.DeviceSettingsScreen import DeviceSettingsScreen
 
@@ -56,13 +57,14 @@ class DisplayUI:
 
         # Register screens
         self.screens = {
+            "dashboard": SystemDashboardScreen(self),
             "main": MainScreen(self),
             "systemsettings": SystemSettingsScreen (self),
             "devicesettings": DeviceSettingsScreen(self)
         }
 
-        # Starting on the main screen
-        self.current_screen = self.screens["main"]
+        # Starting on the system dashboard screen
+        self.current_screen = self.screens["dashboard"]
         self._running = False
 
 

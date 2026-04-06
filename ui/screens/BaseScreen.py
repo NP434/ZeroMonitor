@@ -56,4 +56,3 @@ class BaseScreen:
         Method for drawing elements on the screen.
         """
         pass
-

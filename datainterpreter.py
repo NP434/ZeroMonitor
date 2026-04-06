@@ -6,6 +6,7 @@ import json
 import os
 import smtplib
 import ssl
+import logging
 from email.message import EmailMessage
 from typing import Optional
 from event_bus import EventBus
@@ -88,17 +89,21 @@ class DataInterpreter:
 
         if not metric_event.success:
             logging.warning(f"[DataInterpreter] Handling failed metric event for {metric_event.node}: {metric_event.payload}")
-            # Still persist the failure so we know what's happening
             try:
-                self._write_failed_event_to_json(metric_event)
+                offline_payload = self._build_offline_payload(metric_event)
+                self._write_to_json_file(offline_payload)
+                self.event_bus.publish("device_offline", offline_payload)
+                self.event_bus.publish("data_interpreted", offline_payload)
             except Exception as e:
-                logging.error(f"[DataInterpreter] Failed to write error event: {e}")
+                logging.error(f"[DataInterpreter] Failed to write offline event: {e}")
             return
 
         interpreted = self.process_data(metric_event)
 
         # Annotate severities so they're always present in the published interpreted data
         interpreted = self._annotate_severity(interpreted)
+        interpreted["status"] = "online"
+        interpreted["success"] = True
 
         # Persist interpreted metrics to JSON file (updates per-node entry)
         try:
@@ -193,79 +198,69 @@ class DataInterpreter:
         interpreted["severities"] = severities
         return interpreted
 
-    # Persistence: write/update JSON file with latest interpreted data per node
-    def _write_to_json_file(self, interpreted):
-        data = {}
+    def _load_cache_entries(self):
         filepath = self.json_filepath
+        if not os.path.exists(filepath):
+            return {}
 
-        # Ensure directory exists
-        dirpath = os.path.dirname(filepath)
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def _ensure_cache_directory(self):
+        dirpath = os.path.dirname(self.json_filepath)
         if dirpath and not os.path.exists(dirpath):
             os.makedirs(dirpath, exist_ok=True)
 
-        # Load existing
-        if os.path.exists(filepath):
-            try:
-                with open(filepath, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception:
-                data = {}
+    def _write_cache_entries(self, data):
+        filepath = self.json_filepath
+        tmp_path = f"{filepath}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, sort_keys=True)
+        os.replace(tmp_path, filepath)
+
+    def _build_offline_payload(self, metric_event):
+        node = metric_event.node
+        existing_entry = self._load_cache_entries().get(node, {})
+
+        return {
+            "node": node,
+            "timestamp": metric_event.timestamp,
+            "status": "offline",
+            "success": False,
+            "error": metric_event.payload.get("error", "SSH command failed"),
+            "metrics": existing_entry.get("metrics", {}),
+            "severities": existing_entry.get("severities", {}),
+        }
+
+    # Persistence: write/update JSON file with latest interpreted data per node
+    def _write_to_json_file(self, interpreted):
+        data = self._load_cache_entries()
+        self._ensure_cache_directory()
 
         # Update node entry
         node = interpreted.get("node")
         if node is None:
             return
 
-        # Store the interpreted dict (safe types) under node key
-        data[node] = interpreted
+        stored_entry = dict(interpreted)
+        if stored_entry.get("status") == "online":
+            stored_entry.pop("error", None)
 
-        # Write back atomically using temp file
-        tmp_path = f"{filepath}.tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-        os.replace(tmp_path, filepath)
+        data[node] = stored_entry
+        self._write_cache_entries(data)
 
         import logging
         logging.info(f"[DataInterpreter] Updated cache_data.json for node '{node}' at {interpreted.get('timestamp')}")
 
-    def _write_failed_event_to_json(self, metric_event):
-        """Write failed metric events to cache for debugging"""
-        data = {}
-        filepath = self.json_filepath
-
-        # Ensure directory exists
-        dirpath = os.path.dirname(filepath)
-        if dirpath and not os.path.exists(dirpath):
-            os.makedirs(dirpath, exist_ok=True)
-
-        # Load existing
-        if os.path.exists(filepath):
-            try:
-                with open(filepath, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception:
-                data = {}
-
-        node = metric_event.node
-        if node is None:
-            return
-
-        # Store the error event
-        data[node] = {
-            "node": node,
-            "timestamp": metric_event.timestamp,
-            "error": metric_event.payload.get("error", "Unknown error"),
-            "success": False
-        }
-
-        # Write back atomically
-        tmp_path = f"{filepath}.tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-        os.replace(tmp_path, filepath)
-
-        import logging
-        logging.info(f"[DataInterpreter] Updated cache_data.json with error for node '{node}'")
+    def _write_offline_event_to_json(self, metric_event):
+        """Write offline status to cache when device fails SSH command"""
+        offline_payload = self._build_offline_payload(metric_event)
+        self._write_to_json_file(offline_payload)
+        logging.info(f"[DataInterpreter] Marked device '{metric_event.node}' as OFFLINE at {metric_event.timestamp}")
 
     # Email sending for warnings (no-op if SMTP not configured)
     def _send_warning_email(self, interpreted):

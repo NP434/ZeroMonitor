@@ -23,6 +23,9 @@ class Config:
         self.ssh_key_enc = os.path.join(self.storage_dir, "id_ed25519.enc")
         self.ssh_key_ram = os.path.join(self.ram_dir, "decrypted_key")
         self.pass_file = os.path.join(self.ram_dir, "zero_pass.txt")
+        self.pairing_info = os.path.join(self.storage_dir, "pairing_info.json")
+        self.server_cert = os.path.join(self.storage_dir, "server.crt")
+        self.server_key = os.path.join(self.storage_dir, "server.key")
         self.cache_file = os.path.join(self.storage_dir, "cache_data.json")
         self.email_settings = os.path.join(self.storage_dir, "email_settings.json")
 

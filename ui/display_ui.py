@@ -96,6 +96,8 @@ class DisplayUI:
             "main": MainScreen(self),
             "settings": SettingsScreen (self),
             "add_device": AddScreen(self),
+            "settings" : SettingsScreen(self),
+            "init": InitScreen(self),
 
             # Boot Screens
             "init_passcode": InitScreen(self),

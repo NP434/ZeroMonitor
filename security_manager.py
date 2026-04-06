@@ -17,6 +17,7 @@ class SecurityManager:
         # Subscribe to the UI's security events
         self.bus.subscribe("CREATE_PASSCODE", self._handle_create_secrets)
         self.bus.subscribe("UNLOCK_VAULT", self._handle_unlock_vault)
+        self.bus.subscribe("SYNC_VAULT", self._handle_sync_vault)
 
     def _handle_create_secrets(self, payload):
         """Generates SSH keys and encrypts the vault (Runs in ALL modes)"""
@@ -37,7 +38,20 @@ class SecurityManager:
         
         with open(self.config.ssh_key_enc, "wb") as f:
             f.write(encrypted_ssh)
-        self.logger.info("Encrypted SSH keys generated.")
+        self.logger.info("Encrypted SSH key generated.")
+
+        # --- Process the Public Key (Unencrypted) ---
+        public_key = private_key.public_key()
+        public_ssh = public_key.public_bytes(
+            encoding=serialization.Encoding.OpenSSH,
+            format=serialization.PublicFormat.OpenSSH
+        )
+        
+        # Save the public key to disk (Ensure self.config.ssh_pub_key exists in paths.py)
+        with open(self.config.ssh_pub_key, "wb") as f:
+            f.write(public_ssh)
+            
+        self.logger.info("Public SSH key generated.")
 
         # --- Create the Initial Device List ---
         self.logger.info("Creating initial device list...")
@@ -92,6 +106,10 @@ class SecurityManager:
             )
             encryption_key = base64.urlsafe_b64encode(kdf.derive(passcode_bytes))
 
+            # Save key for JSON Encryption
+            self._session_key = encryption_key
+            self._session_salt = salt
+
             # Decrypt
             fernet = Fernet(encryption_key)
             decrypted_json_bytes = fernet.decrypt(encrypted_data)
@@ -134,3 +152,30 @@ class SecurityManager:
                 "success": False, 
                 "error": error_str
             })
+
+    def _handle_sync_vault(self, payload=None):
+        """Reads the unencrypted RAM device list and safely encrypts it back to storage."""
+        ### self.app.bus.publish("SYNC_VAULT", {}) # Update Encrypted JSON
+        if not self._session_key or not self._session_salt:
+            self.logger.error("Cannot sync vault: No active security session.")
+            return
+
+        self.logger.info("Syncing updated device list to secure storage...")
+
+        try:
+            # Read the updated JSON from RAM
+            with open(self.config.decrypted_list, "rb") as f:
+                raw_json_bytes = f.read()
+
+            # Encrypt using the active session key
+            fernet = Fernet(self._session_key)
+            encrypted_data = fernet.encrypt(raw_json_bytes)
+
+            # Write back to storage (Must prepend the salt so it can be unlocked next boot!)
+            with open(self.config.encrypted_list, "wb") as f:
+                f.write(self._session_salt + encrypted_data)
+
+            self.logger.info("Vault sync complete.")
+
+        except Exception as e:
+            self.logger.error(f"Failed to sync vault: {e}")

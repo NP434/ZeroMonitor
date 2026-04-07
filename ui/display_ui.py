@@ -289,6 +289,14 @@ class DisplayUI:
             self.current_screen.update()
             self.current_screen.draw(self.screen)
 
+            # Apply dimming overlay
+            alpha = self.ui_control.get_dimming_alpha()
+            if alpha > 0:
+                overlay = pygame.Surface((self.width, self.height))
+                overlay.fill((0, 0, 0))
+                overlay.set_alpha(alpha)
+                self.screen.blit(overlay, (0, 0))
+
             pygame.display.flip()
 
         pygame.quit()

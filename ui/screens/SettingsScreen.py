@@ -111,7 +111,7 @@ class SettingsScreen(BaseScreen):
             rect=(slider_x, slider_y, slider_w, 20),
             min_value=0,
             max_value=100,
-            default_value=50,
+            default_value=self.app.ui_control.simulate_brightness,
             label="Brightness",
             track_color=theme.BLUE,
             on_change=self._on_brightness_change,

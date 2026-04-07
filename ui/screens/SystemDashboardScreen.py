@@ -5,6 +5,7 @@ import os
 from ui.screens.BaseScreen import BaseScreen
 from ui.widgets.Button import Button
 import ui.theme as theme
+import ui.utilities as utilities
 
 
 class SystemDashboardScreen(BaseScreen):
@@ -435,7 +436,7 @@ class SystemDashboardScreen(BaseScreen):
 
             # Format value
             value = averages[metric_key]
-            value_str = self._format_metric_value(metric_key, value)
+            value_str = utilities.format_metric_value(metric_key, value)
 
             # Draw value with accent color
             value_text = value_font.render(value_str, True, theme.WHITE)
@@ -567,17 +568,6 @@ class SystemDashboardScreen(BaseScreen):
         if not self.show_network_lines:
             self._draw_network_summary(surface, rect, averages)
 
-    def _format_metric_value(self, metric_key, value):
-        if metric_key in {"net_rx_kbps", "net_tx_kbps"}:
-            if value >= 1000:
-                return f"{value / 1000.0:.2f} Mbps"
-            return f"{value:.0f} kbps"
-
-        if metric_key == "cpu_load_1m":
-            return f"{value:.2f}"
-
-        unit = self.METRIC_UNITS.get(metric_key, "")
-        return f"{value:.1f}{unit}"
 
     def _normalize_metric_value(self, metric_key, value):
         scale_limit = self.GRAPH_SCALE_LIMITS.get(metric_key, max(1.0, value))
@@ -645,9 +635,9 @@ class SystemDashboardScreen(BaseScreen):
 
         parts = []
         if down is not None:
-            parts.append(f"Down {self._format_metric_value('net_rx_kbps', down)}")
+            parts.append(f"Down {utilities.format_metric_value('net_rx_kbps', down)}")
         if up is not None:
-            parts.append(f"Up {self._format_metric_value('net_tx_kbps', up)}")
+            parts.append(f"Up {utilities.format_metric_value('net_tx_kbps', up)}")
 
         label = "Net: " + "   ".join(parts)
         text = theme.FONT_SMALL.render(label, True, theme.LIGHTER_GRAY)

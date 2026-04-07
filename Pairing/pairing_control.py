@@ -144,13 +144,13 @@ class ControlPairing:
                     # Try Linux/macOS
                     print("Trying linux check")
                     result = con.run("cat /etc/os-release", hide=True)
-                    os_info = "Linux" if result.ok else "OS_Unkown"
+                    os_info = "Linux"
                 except Exception:
                 # Fallback to Windows
                     try:
                         print("Trying Windows check")
                         result = con.run("Get-ComputerInfo", hide=True)
-                        os_info = "Windows" if result.ok else "OS_Unknown"
+                        os_info = "Windows"
                     except Exception:
                         os_info = "OS_Unknown"
 

@@ -12,7 +12,7 @@ import time
 import os
 import socket
 import threading
-
+from fabric import Connection
 
 def upload_key_async(key_path):
     with open(key_path, "rb") as f:
@@ -137,14 +137,29 @@ class ControlPairing:
 
         elif node_config["pairing_mode"] == "Pass_auth":
             #Handles the password bassed ssh login if selected by the user
-            os_info = subprocess.run([p_script, un,hn, pw ],
-                                     check = True,
-                                     text=True,
-                                     capture_output=True)
-            node_config["operating_system"] = os_info.stdout.strip()
-            del node_config["pairing_mode"]
+            try:
+                con = Connection(host = hn, user = un, connect_kwargs={"password": pw})        
+                try:
+                    # Try Linux/macOS
+                    result = con.run("cat /etc/os-release", hide=True)
+                    os_info = result.stdout.strip() if result.ok else ""
+                except Exception:
+                # Fallback to Windows
+                    try:
+                        result = con.run("ver", hide=True)
+                        os_info = result.stdout.strip() if result.ok else "OS_Unknown"
+                    except Exception:
+                        os_info = "OS_Unknown"
+
+            except Exception as e:
+                print(f"[!] SSH connection failed: {e}")
+                os_info = "OS_Unknown"
+            finally:
+                con.close()
+
             with open("device_list.json", "w") as f:
                 json.dump(f,node_config, indent=4)
+                
         self.bus.publish("SYNC_VAULT", {})
 
         

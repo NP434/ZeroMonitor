@@ -7,11 +7,16 @@ from pathlib import Path
 from secrets import token_hex
 import json
 import threading
+import sys
 
 BASE_DIR = Path(__file__).resolve().parent
-CERT_DIR = BASE_DIR / "certs"
-KEY_FILE = BASE_DIR / "uploaded_key.pub"
-PK_FILE = BASE_DIR / "Pdata.json"
+
+
+KEY_FILE = Path(sys.argv[1] if len(sys.argv) > 1 else None)
+PK_FILE = Path(sys.argv[2] if len(sys.argv) > 2 else None)
+SERV_CERT = Path(sys.argv[3] if len(sys.argv) > 3 else None)
+SERV_KEY = Path(sys.argv[1] if len(sys.argv) > 4 else None)
+
 
 def get_pairing_token():
     if not PK_FILE.exists():
@@ -77,6 +82,6 @@ if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
         port=8443,
-        ssl_context=(CERT_DIR / "server.crt",
-                     CERT_DIR / "server.key")
+        ssl_context=(SERV_CERT,
+                     SERV_KEY)
     )

@@ -6,15 +6,17 @@ set -ex
 
 ### Setting File locations ###
 echo "Setting File Paths"
-JSON_INT="Pairing/json_interpreter.py"
-SSH_KEY="$HOME/.ssh/id_rsa.pub"
 SERVER_APP="Pairing/endpoint.py"
 SERVER_URL="https://127.0.0.1:8443"
-DEVICE_LIST="device_list.json"
 
 ### setting varaibles ###
 UN="$1"
 HN="$2"
+SSH_KEY="$3"
+DEVICE_LIST="$4"
+PAIRING="$5"
+SERV_CERT="$6"
+SERV_KEY="$7"
 
 if [ ! -f "$SSH_KEY" ]; then
   echo "[*] SSH key does not exits."
@@ -25,7 +27,7 @@ fi
 
 ### HTTPS Start up ###
 echo "Endpoint start up"
-python -u "$SERVER_APP" &
+python -u "$SERVER_APP" "$SSH_KEY" "$PAIRING" "$SERV_CERT" "$SERV_KEY" &
 FLASK_PID=$!
 
 ### Wait for flask to start

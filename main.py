@@ -55,7 +55,7 @@ data_interpreter = DataInterpreter(bus, config=config, json_filepath=config.cach
 
 # Create the UI backend control interface (publishing control events)
 ui_control = ControlUI(bus, config=config)
-pair_control = ControlPairing(bus)
+pair_control = ControlPairing(bus, config=config)
 security = SecurityManager(event_bus=bus, config=config)
 network = NetworkManager(bus=bus, config=config)
 

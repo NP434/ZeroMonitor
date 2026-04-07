@@ -11,7 +11,17 @@ import requests
 import time
 import os
 import socket
+import threading
 
+
+def upload_key_async(key_path):
+    with open(key_path, "rb") as f:
+        requests.post(
+            "https://127.0.0.1:8443/transfer",
+            data=f,
+            headers={"Content-Type": "text/plain"},
+            verify=False
+        )
 script = "./Pairing/transfer.sh"
 p_script = "./Pairing/pb_transfer.sh"
 
@@ -61,6 +71,7 @@ class ControlPairing:
             ip = self.get_ip()
             pdat = {"pairing_token": pairing_token,
                 f"Command": 'Curl -k -H "P-Key:{pairing_token}" "https://{ip}:8443/transfer" -o authorized_keys.pub'}
+            print(pairing_token)
             with open(self.config.pairing_info, "w") as f:
                 json.dump(pdat,f)
             self.bus.publish("Display_token",pdat["Command"])
@@ -83,12 +94,7 @@ class ControlPairing:
             try:
                 #Handling key upload
                 print("Uploading data")
-                with open(key_path, "rb") as f:
-                    requests.post("https://127.0.0.1:8443/transfer",
-                    data=f,
-                    headers={"Content-Type": "text/plain"},
-                    verify=False
-                    )
+                threading.Thread(target=upload_key_async,args=(key_path) daemon=True).start()
                 # Get status
                 response = requests.get("https://127.0.0.1:8443/stat", verify=False)
                 status = response.json().get("stat")

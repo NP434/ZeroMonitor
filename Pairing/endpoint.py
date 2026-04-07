@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent
 KEY_FILE = Path(sys.argv[1] if len(sys.argv) > 1 else None)
 PK_FILE = Path(sys.argv[2] if len(sys.argv) > 2 else None)
 SERV_CERT = Path(sys.argv[3] if len(sys.argv) > 3 else None)
-SERV_KEY = Path(sys.argv[1] if len(sys.argv) > 4 else None)
+SERV_KEY = Path(sys.argv[4] if len(sys.argv) > 4 else None)
 
 
 def get_pairing_token():
@@ -82,6 +82,6 @@ if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
         port=8443,
-        ssl_context=(SERV_CERT,
-                     SERV_KEY)
+        ssl_context=(str(SERV_CERT),
+                      str(SERV_KEY))
     )

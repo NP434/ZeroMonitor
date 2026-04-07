@@ -424,6 +424,7 @@ class MainScreen(BaseScreen):
         if metric_value is None:
             return "N/A"
 
+        # Uptime formatting
         if metric_name == "uptime_seconds":
             total = int(metric_value)
             days = total // 86400
@@ -433,14 +434,27 @@ class MainScreen(BaseScreen):
                 return f"{days}d {hours}h {mins}m"
             return f"{hours}h {mins}m"
 
+        # Network Formatting
         if metric_name in {"net_rx_kbps", "net_tx_kbps"}:
             if metric_value >= 1000:
                 return f"{metric_value / 1000.0:.2f} Mbps"
             return f"{metric_value:.0f} kbps"
 
+        # Memory Formatting
         if metric_name in {"mem_used_mb", "mem_total_mb"}:
             return f"{int(metric_value)}{self.METRIC_UNITS.get(metric_name, '')}"
 
+        # CPU Temperature formatting
+        if metric_name == "cpu_temp_c":
+            unit = self.app.temp_unit
+            value = float(metric_value)
+
+            if unit == "F":
+                value = value * 9/5 + 32
+            
+            return f"{value:.1f}°{unit}"
+
+        # CPU load formatting
         if metric_name == "cpu_load_1m":
             return f"{metric_value:.2f}"
 

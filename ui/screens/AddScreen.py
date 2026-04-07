@@ -150,19 +150,18 @@ class AddScreen(BaseScreen):
 
 
             if self.DeviceNameBox.is_clicked(pos):
-                if self.mode == "Endpoint":
-                    if self.active_textbox is not None:
-                        self.active_textbox.activate(False)
-                    self.DeviceNameBox.activate(True)
-                    self.active_textbox = self.DeviceNameBox
-                    self.keyboard.text_consumer = self.DeviceNameBox.consume
+                if self.active_textbox is not None:
+                    self.active_textbox.activate(False)
+                self.DeviceNameBox.activate(True)
+                self.active_textbox = self.DeviceNameBox
+                self.keyboard.text_consumer = self.DeviceNameBox.consume
                     
-                else:
-                    if self.active_textbox is not None:
-                        self.active_textbox.activate(False)
-                    self.passwordBox.activate(True)
-                    self.active_textbox = self.passwordBox
-                    self.keyboard.text_consumer = self.passwordBox.consume
+            if self.passwordBox.is_clicked(pos):
+                if self.active_textbox is not None:
+                    self.active_textbox.activate(False)
+                self.passwordBox.activate(True)
+                self.active_textbox = self.passwordBox
+                self.keyboard.text_consumer = self.passwordBox.consume
                     
 
             elif self.UserNameBox.is_clicked(pos):

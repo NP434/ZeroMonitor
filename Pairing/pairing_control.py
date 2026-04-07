@@ -132,7 +132,7 @@ class ControlPairing:
             node_config["operating_system"] = os_info.stdout.strip()
             del node_config["pairing_mode"]
             with open("device_list.json", "w") as f:
-                json.dump(f,node_config, indent=4)
+                json.dump(node_config,f, indent=4)
 
 
         elif node_config["pairing_mode"] == "Pass_auth":
@@ -161,11 +161,7 @@ class ControlPairing:
                 con.close()
 
             with open("device_list.json", "w") as f:
-                json.dump(f,node_config, indent=4)
-
+                json.dump(node_config,f, indent=4)
+                print("Saving node data to node config")
+        print("Publishing vault event")
         self.bus.publish("SYNC_VAULT", {})
-
-        
-
-        
-

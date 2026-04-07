@@ -100,26 +100,7 @@ class ControlPairing:
                 status = response.json().get("stat")
 
                 if status == "retrieved":
-                    try:
-                        # Try Linux/macOS
-                        os_info = subprocess.check_output(
-                            [ "ssh", "-i", os.path.expanduser("~/.ssh/id_rsa"), f"{un}@{hn}", "cat /etc/os-release"],
-                            stderr=subprocess.DEVNULL,
-                            text=True
-                            )
-                        os_info = "Linux"
-                    except subprocess.CalledProcessError:
-                        try:
-                            # Try Windows
-                            os_info = subprocess.check_output(
-                            ["ssh", "-i", os.path.expanduser("~/.ssh/id_rsa"), f"{un}@{hn}", "ver"],
-                            stderr=subprocess.DEVNULL,
-                            text=True
-                            )
-                            os_info = "Windows"
-
-                        except subprocess.CalledProcessError:
-                            os_info = "OS_Unknown"
+                    os_info = self.detect_os(un, hn)
                 else:
                     os_info = "OS_Unknown"
 
@@ -165,3 +146,36 @@ class ControlPairing:
                 print("Saving node data to node config")
         print("Publishing vault event")
         self.bus.publish("SYNC_VAULT", {})
+
+
+
+    def detect_os(un, hn):
+        ssh_cmd = [
+            "ssh",
+            "-o", "BatchMode=yes",
+            "-o", "StrictHostKeyChecking=no",
+            "-i", os.path.expanduser("~/.ssh/id_rsa"),
+            f"{un}@{hn}",
+            "uname -s"
+        ]
+
+        try:
+            result = subprocess.run(
+                ssh_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5
+            )
+
+            output = result.stdout.strip().lower()
+
+            if "linux" in output:
+                return "Linux"
+            if "mingw" in output or "windows" in output:
+                return "Windows"
+
+            return "OS_Unknown"
+
+        except Exception:
+            return "OS_Unknown"

@@ -48,8 +48,8 @@ class ControlPairing:
         key_path = self.config.ssh_pub_key
         list_path = self.config.decrypted_list
         pairing_path = self.config.pairing_info
-        serv_cert_path = self.config.server_cert
-        serv_key_path = self.config.server_key
+        serv_cert_path = str(Path(self.config.server_cert).resolve())
+        serv_key_path = str(Path(self.config.server_key).resolve())
 
         if node_config["pairing_mode"] == "Endpoint":
             # This section handles the logic of the endpoint creation and

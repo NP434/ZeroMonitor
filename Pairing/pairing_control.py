@@ -149,7 +149,7 @@ class ControlPairing:
                 # Fallback to Windows
                     try:
                         print("Trying Windows check")
-                        result = con.run("ver", hide=True)
+                        result = con.run("Get-ComputerInfo", hide=True)
                         os_info = "Windows" if result.ok else "OS_Unknown"
                     except Exception:
                         os_info = "OS_Unknown"

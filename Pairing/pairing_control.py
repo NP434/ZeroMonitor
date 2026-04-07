@@ -94,7 +94,7 @@ class ControlPairing:
             try:
                 #Handling key upload
                 print("Uploading data")
-                threading.Thread(target=upload_key_async,args=(key_path), daemon=True).start()
+                threading.Thread(target=upload_key_async,args=(key_path,), daemon=True).start()
                 # Get status
                 response = requests.get("https://127.0.0.1:8443/stat", verify=False)
                 status = response.json().get("stat")

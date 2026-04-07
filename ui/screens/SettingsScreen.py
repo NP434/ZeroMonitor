@@ -104,6 +104,7 @@ class SettingsScreen(BaseScreen):
         slider_x = app.width // 2 - 280
         slider_y = CONTENT_Y + 90
         slider_w = 560
+        self.slider_x = slider_x
 
         self.brightness_slider = Slider(
             app,
@@ -118,32 +119,32 @@ class SettingsScreen(BaseScreen):
         self.brightness_value = 50
         self._saved_brightness = 50       # track what has been applied
 
+        toggle_y = slider_y + 110
+        self.temp_unit_toggle = ToggleSwitch(
+            self.app,
+            rect=(slider_x, toggle_y, 60, 32),
+            default=False
+        )
+
         apply_w = 180
         self.system_apply_btn = Button(
-            pygame.Rect(app.width // 2 - apply_w // 2, slider_y + 50, apply_w, 42),
+            pygame.Rect(app.width // 2 - apply_w // 2, toggle_y + 60, apply_w, 42),
             text="Apply",
-            bg_color=theme.DARK_GRAY,   # starts greyed — nothing unsaved yet
+            bg_color=theme.DARK_GRAY,
             border_radius=10,
         )
+        self.temp_unit_label = "°C / °F"
+        self._saved_temp_unit = getattr(self.app, "temp_unit", "C")
 
         # ── Device tab widgets ─────────────────────────────────────────────
         self._build_device_list()
 
         self.device_apply_btn = Button(
-            pygame.Rect(10, app.height - 54, self.sidebar_width - 20, 42),
-            text="Apply Changes",
-            bg_color=theme.GREEN,
-            border_radius=10,
+        pygame.Rect(10, app.height - 54, self.sidebar_width - 20, 42),
+        text="Apply Changes",
+        bg_color=theme.GREEN,
+        border_radius=10,
         )
-
-        toggle_y = slider_y + 110
-        self.temp_unit_toggle = ToggleSwitch(
-            self.app,
-            rect=(150, toggle_y, 60, 32),
-            default=False  # False = Celsius, True = Fahrenheit
-        )
-        self.temp_unit_label = "°C / °F"
-
     # ══════════════════════════════════════════════════════════════════════
     # System tab
     # ══════════════════════════════════════════════════════════════════════
@@ -431,13 +432,9 @@ class SettingsScreen(BaseScreen):
         # Slider needs all event types (drag / motion), not just clicks
         if self.active_tab == TAB_SYSTEM:
             self.brightness_slider.handle_event(event)
-
             result = self.temp_unit_toggle.handle_event(event)
             if result is not None:
                 self._on_temp_unit_change(result)
-            if self.system_unsaved and self.system_apply_btn.is_clicked(event.pos):
-                self._apply_system()
-            return
 
         pos = utilities.get_event_pos(event, self.app)
         if pos is None:
@@ -654,12 +651,23 @@ class SettingsScreen(BaseScreen):
 
         self.brightness_slider.draw(surface)
 
-        # Temperature unit
-        lbl = theme.FONT_SMALL.render("Temperature Unit  °C", True, theme.LIGHT_GRAY)
-        surface.blit(lbl, (self.app.width // 2 - 30, self.temp_unit_toggle.rect.y - 24))
+        is_fahrenheit = self.app.temp_unit == "F"
+
+        c_lbl = theme.FONT_SMALL.render("°C", True, theme.WHITE if not is_fahrenheit else theme.LIGHT_GRAY)
+        f_lbl = theme.FONT_SMALL.render("°F", True, theme.WHITE if is_fahrenheit else theme.LIGHT_GRAY)
+        row_label = theme.FONT_SMALL.render("Temperature Unit", True, theme.WHITE)
+
+        toggle_y = self.temp_unit_toggle.rect.y
+        toggle_h = self.temp_unit_toggle.rect.height
+
+        surface.blit(row_label, (self.slider_x, toggle_y - 24))
+        surface.blit(c_lbl, (self.slider_x, toggle_y + (toggle_h - c_lbl.get_height()) // 2))
+
+        self.temp_unit_toggle.rect.x = self.slider_x + c_lbl.get_width() + 10
         self.temp_unit_toggle.draw(surface)
-        f_lbl = theme.FONT_SMALL.render("°F", True, theme.LIGHT_GRAY)
-        surface.blit(f_lbl, (self.app.width // 2 + 40, self.temp_unit_toggle.rect.y))
+
+        f_y = toggle_y + (toggle_h - f_lbl.get_height()) // 2
+        surface.blit(f_lbl, (self.temp_unit_toggle.rect.right + 10, f_y))
 
         # Apply button: green when there's something to save, dark grey otherwise
         self.system_apply_btn.bg_color = (theme.GREEN if self.system_unsaved

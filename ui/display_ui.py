@@ -61,12 +61,6 @@ class DisplayUI:
 
         # For DEV MODE and Pathing
         self.config = config 
-        # Load Devices safely using Config Paths
-        self.devices = []
-        if os.path.exists(self.config.decrypted_list):
-            with open(self.config.decrypted_list, "r", encoding='utf-8') as file:
-                device_data = json.load(file)
-                self.devices = list(device_data.values())
 
         # Event subscriptions
         self.bus.subscribe("STOP_SYSTEM", self._handle_stop_system)
@@ -90,6 +84,9 @@ class DisplayUI:
             with open(self.config.decrypted_list, "r", encoding='utf-8') as file:
                 device_data = json.load(file)
                 self.devices = list(device_data.values())
+
+        # User Temperature Preference
+        self.temp_unit = "C"
 
         # Register screens
         self.screens = {

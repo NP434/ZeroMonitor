@@ -158,7 +158,7 @@ class InitScreen(BaseScreen):
                     self.app.change_screen("email_setup")
                 else:
                     self.logger.info(f"Fully authenticated and configured. Welcome to the dashboard!")
-                    self.app.change_screen("main")
+                    self.app.change_screen("dashboard")
         
         else:
             # Failure: Show error and reset

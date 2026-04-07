@@ -64,24 +64,35 @@ class MainScreen(BaseScreen):
         # Load assets
         self.load_assets()
         power_icon = pygame.transform.smoothscale(self.assets["power_button.png"], (40, 40))
-        remove_icon = pygame.transform.smoothscale(self.assets["trash.png"], (40,40))
-        
-        # Create Power Button
-        power_width = 60
-        power_height = 60
-        power_x = self.app.width - power_width - 10
-        power_y = 20
+        remove_icon = pygame.transform.smoothscale(self.assets["trash.png"], (40, 40))
+
+        # Create Power Button with consistent spacing
+        power_width = 50
+        power_height = 50
+        power_x = self.app.width - power_width - theme.MARGIN_XLARGE
+        power_y = theme.MARGIN_LARGE + 5
         self.power_button = Button(
-        rect=(power_x, power_y, power_width, power_height),
-        image=power_icon,
-        bg_color=theme.POWER_RED
+            rect=(power_x, power_y, power_width, power_height),
+            image=power_icon,
+            bg_color=theme.POWER_RED
+        )
+
+        # Create Dashboard Button with consistent sizing
+        dashboard_width = 130
+        dashboard_height = 45
+        dashboard_x = power_x - dashboard_width - theme.GAP_LARGE
+        dashboard_y = theme.MARGIN_LARGE + 8
+        self.dashboard_button = Button(
+            rect=(dashboard_x, dashboard_y, dashboard_width, dashboard_height),
+            bg_color=theme.BLUE,
+            text="Dashboard"
         )
 
         # Create Settings Button
-        settings_width = 160
-        settings_height = 60
-        settings_x = power_x - settings_width - 10
-        settings_y = 20
+        settings_width = 130
+        settings_height = 45
+        settings_x = dashboard_x - settings_width - theme.GAP_LARGE
+        settings_y = theme.MARGIN_LARGE + 8
         self.settings_button = Button(
             rect=(settings_x, settings_y, settings_width, settings_height),
             bg_color=theme.BLUE,
@@ -134,7 +145,7 @@ class MainScreen(BaseScreen):
         )
         self.add_mode = False
 
-        # Initalize device list
+        # Initialize device list
         self.device_buttons = []
         self.device_scroll = 0
         self._build_device_buttons()
@@ -198,6 +209,10 @@ class MainScreen(BaseScreen):
             # Power Button clicked
             if self.power_button.is_clicked(pos):
                 self.app.ui_control.stop_system()
+
+            # Dashboard button clicked
+            if self.dashboard_button.is_clicked(pos):
+                self.app.change_screen("dashboard")
 
             # Settings button clicked
             if self.settings_button.is_clicked(pos):
@@ -283,10 +298,10 @@ class MainScreen(BaseScreen):
     def draw(self, surface):
         surface.fill(theme.BLACK)
 
-        # Draw top bar background
-        top_bar_height = 90
-        pygame.draw.rect(surface, theme.DARK_GRAY, (0, 0, self.app.width, top_bar_height))
-        pygame.draw.line(surface, theme.BLUE, (0, top_bar_height), (self.app.width, top_bar_height), 2)
+        # Draw top bar background with improved styling
+        pygame.draw.rect(surface, theme.TOPBAR_BG, (0, 0, self.app.width, theme.TOPBAR_HEIGHT))
+        pygame.draw.line(surface, theme.TOPBAR_BORDER_COLOR, (0, theme.TOPBAR_HEIGHT),
+                        (self.app.width, theme.TOPBAR_HEIGHT), theme.TOPBAR_BORDER_WIDTH)
 
         if self.use_24hr:
             now = datetime.datetime.now().strftime("%H:%M")
@@ -294,28 +309,33 @@ class MainScreen(BaseScreen):
             now = datetime.datetime.now().strftime("%I:%M %p")
 
         time_text = theme.FONT_MEDIUM.render(now, True, theme.BRIGHT_BLUE)
-        surface.blit(time_text, (30, 25))
+        surface.blit(time_text, (theme.MARGIN_XLARGE, theme.MARGIN_LARGE + 5))
 
-        title_text = pygame.font.SysFont("Arial", 36, bold=True).render("Zero Monitor", True, theme.BRIGHT_BLUE)
-        title_rect = title_text.get_rect(center=(self.app.width // 2, 45))
+        # Use theme title font
+        title_text = theme.FONT_TITLE.render("Devices", True, theme.BRIGHT_BLUE)
+        title_rect = title_text.get_rect(center=(self.app.width // 2, theme.TOPBAR_HEIGHT // 2 + 5))
         surface.blit(title_text, title_rect)
 
+        self.dashboard_button.draw(surface)
         self.settings_button.draw(surface)
         self.power_button.draw(surface)
 
         if self.selected_device:
             sidebar_width = self.sidebar.current_width
-            content_left = sidebar_width + 28
-            content_right = self.app.width - 24
+            content_left = sidebar_width + theme.MARGIN_XLARGE
+            content_right = self.app.width - theme.MARGIN_LARGE
             content_width = max(260, content_right - content_left)
             content_center_x = content_left + content_width // 2
 
-            device_name_font = pygame.font.SysFont("Arial", 28, bold=True)
+            # Device name with improved typography
+            device_name_font = theme.FONT_XLARGE
             device_name = device_name_font.render(f"{self.selected_device['name']}", True, theme.BRIGHT_BLUE)
-            device_name_rect = device_name.get_rect(center=(content_center_x, 126))
+            device_name_rect = device_name.get_rect(center=(content_center_x, theme.TOPBAR_HEIGHT + 35))
             surface.blit(device_name, device_name_rect)
 
-            pygame.draw.line(surface, theme.GRAY, (content_left, 154), (content_right, 154), 2)
+            # Better separator line
+            pygame.draw.line(surface, theme.GRAY, (content_left, theme.TOPBAR_HEIGHT + 65),
+                           (content_right, theme.TOPBAR_HEIGHT + 65), theme.BORDER_WIDTH_MEDIUM)
 
             device_name_key = self.selected_device["name"]
             device_data = self.cache_data.get(device_name_key, {})
@@ -323,8 +343,9 @@ class MainScreen(BaseScreen):
             severities = device_data.get("severities", {})
             timestamp = self._format_timestamp(device_data.get("timestamp", "N/A"))
 
-            timestamp_text = theme.FONT_SMALL.render(f"Updated: {timestamp}", True, theme.LIGHT_GRAY)
-            surface.blit(timestamp_text, (content_left, 166))
+            # Timestamp with better styling
+            timestamp_text = theme.FONT_SMALL.render(f"Last updated: {timestamp}", True, theme.LIGHT_GRAY)
+            surface.blit(timestamp_text, (content_left, theme.TOPBAR_HEIGHT + 75))
 
             # Build a stable metric list with preferred order first, then any extras.
             ordered_metrics = []
@@ -337,16 +358,17 @@ class MainScreen(BaseScreen):
                 if key not in seen:
                     ordered_metrics.append((key, value))
 
-            grid_top = 198
-            card_gap = 14
-            card_height = 82
+            # Improved metric card grid with better spacing
+            grid_top = theme.TOPBAR_HEIGHT + 110
+            card_gap = theme.GAP_LARGE
+            card_height = 90
             columns = 2
             card_width = (content_width - card_gap) // columns
 
             rows = (len(ordered_metrics) + columns - 1) // columns
             self.metric_content_height = max(0, rows * (card_height + card_gap) - card_gap)
 
-            viewport_bottom = self.app.height - 30
+            viewport_bottom = self.app.height - theme.MARGIN_LARGE
             self.metric_viewport_rect = pygame.Rect(
                 content_left,
                 grid_top,
@@ -465,19 +487,22 @@ class MainScreen(BaseScreen):
 
     def _draw_metric_card(self, surface, rect, label, value, severity):
         severity_color = theme.STATUS_COLORS.get(severity, theme.WHITE)
-        panel_bg = (22, 22, 22)
 
-        pygame.draw.rect(surface, panel_bg, rect, border_radius=12)
-        pygame.draw.rect(surface, severity_color, rect, 2, border_radius=12)
+        # Draw card background with rounded corners
+        pygame.draw.rect(surface, theme.CARD_BG, rect, border_radius=theme.CARD_CORNER_RADIUS)
+        # Draw border based on severity
+        pygame.draw.rect(surface, severity_color, rect, theme.CARD_BORDER_WIDTH, border_radius=theme.CARD_CORNER_RADIUS)
 
-        label_font = pygame.font.SysFont("Arial", 18)
-        value_font = pygame.font.SysFont("Arial", 28, bold=True)
+        # Improved typography
+        label_font = pygame.font.SysFont("Arial", 16)
+        value_font = pygame.font.SysFont("Arial", 32, bold=True)
 
-        label_text = label_font.render(label, True, theme.LIGHT_GRAY)
+        label_text = label_font.render(label, True, theme.LIGHTER_GRAY)
         value_text = value_font.render(value, True, severity_color)
 
-        surface.blit(label_text, (rect.x + 12, rect.y + 10))
-        value_rect = value_text.get_rect(left=rect.x + 12, bottom=rect.bottom - 10)
+        # Better padding and alignment
+        surface.blit(label_text, (rect.x + theme.CARD_PADDING, rect.y + theme.PADDING_MEDIUM))
+        value_rect = value_text.get_rect(left=rect.x + theme.CARD_PADDING, bottom=rect.bottom - theme.PADDING_MEDIUM)
         surface.blit(value_text, value_rect)
 
     def _clamp_metric_scroll(self):

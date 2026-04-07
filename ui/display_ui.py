@@ -12,6 +12,7 @@ import sys
 import os
 import subprocess
 from ui.screens.MainScreen import MainScreen
+from ui.screens.SystemDashboardScreen import SystemDashboardScreen
 from ui.screens.SettingsScreen import SettingsScreen
 from ui.screens.AddScreen import AddScreen
 from ui.screens.WiFiScreen import WiFiScreen
@@ -90,9 +91,12 @@ class DisplayUI:
 
         # Register screens
         self.screens = {
+            "dashboard": SystemDashboardScreen(self),
             "main": MainScreen(self),
             "settings": SettingsScreen (self),
             "add_device": AddScreen(self),
+            "settings" : SettingsScreen(self),
+            "init": InitScreen(self),
 
             # Boot Screens
             "init_passcode": InitScreen(self),
@@ -100,7 +104,7 @@ class DisplayUI:
             "email_setup": EmailScreen(self)
         }
 
-        # Starting on the main screen
+        # Logic for starting screen, DO NOT CHANGE
         start_key = self._boot_router()
         self.current_screen = self.screens[start_key]
         self._running = False

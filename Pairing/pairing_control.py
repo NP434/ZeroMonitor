@@ -137,17 +137,20 @@ class ControlPairing:
 
         elif node_config["pairing_mode"] == "Pass_auth":
             #Handles the password bassed ssh login if selected by the user
+            print("Using password based authentication")
             try:
                 con = Connection(host = hn, user = un, connect_kwargs={"password": pw})        
                 try:
                     # Try Linux/macOS
+                    print("Trying linux check")
                     result = con.run("cat /etc/os-release", hide=True)
-                    os_info = result.stdout.strip() if result.ok else ""
+                    os_info = "Linux" if result.ok else "OS_Unkown"
                 except Exception:
                 # Fallback to Windows
                     try:
+                        print("Trying Windows check")
                         result = con.run("ver", hide=True)
-                        os_info = result.stdout.strip() if result.ok else "OS_Unknown"
+                        os_info = "Windows" if result.ok else "OS_Unknown"
                     except Exception:
                         os_info = "OS_Unknown"
 
@@ -159,7 +162,7 @@ class ControlPairing:
 
             with open("device_list.json", "w") as f:
                 json.dump(f,node_config, indent=4)
-                
+
         self.bus.publish("SYNC_VAULT", {})
 
         

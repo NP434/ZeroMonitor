@@ -74,9 +74,7 @@ class ControlPairing:
             # Start endpoint server
             print("Endpoint start up")
             flask_proc = subprocess.Popen(
-                ["python", "-u", "Pairing/endpoint.py", key_path, pairing_path, serv_cert_path, serv_key_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+                ["python", "-u", "Pairing/endpoint.py", key_path, pairing_path, serv_cert_path, serv_key_path]
             )
 
             # Wait for server to start

@@ -567,7 +567,7 @@ class SettingsScreen(BaseScreen):
             self._clamp_device_scroll()
 
         if event.type == pygame.FINGERMOTION and self.active_tab == TAB_DEVICE and self.selected_device:
-            self.device_scroll -= event.dy * 50
+            self.device_scroll -= event.dy * 100
             self._clamp_device_scroll()
 
         if pos is None:
@@ -575,9 +575,6 @@ class SettingsScreen(BaseScreen):
 
         if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN) and event.type != pygame.MOUSEWHEEL:
             return
-
-        if self.active_tab == TAB_DEVICE and self.selected_device:
-            pos = (pos[0], pos[1] - self.device_scroll)
 
         # ── Header ────────────────────────────────────────────────────────
         if self.back_btn.is_clicked(pos):

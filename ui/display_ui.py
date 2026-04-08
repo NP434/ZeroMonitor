@@ -282,12 +282,19 @@ class DisplayUI:
                 if event.type == pygame.QUIT:
                     self.shutdown()
 
+                # Update activity on touch
+                if event.type in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN):
+                    self.ui_control.update_activity()
+
                 # Send events to the active screen to be handled
                 self.current_screen.handle_event(event)
             
             # Update and draw the active screen  
             self.current_screen.update()
             self.current_screen.draw(self.screen)
+
+            # Check for sleep
+            self.ui_control.check_sleep()
 
             # Apply dimming overlay
             alpha = self.ui_control.get_dimming_alpha()

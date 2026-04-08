@@ -116,8 +116,8 @@ class SettingsScreen(BaseScreen):
             track_color=theme.BLUE,
             on_change=self._on_brightness_change,
         )
-        self.brightness_value = 50
-        self._saved_brightness = 50       # track what has been applied
+        self.brightness_value = self.app.ui_control.simulate_brightness
+        self._saved_brightness = self.app.ui_control.simulate_brightness
 
         toggle_y = slider_y + 110
         self.temp_unit_toggle = ToggleSwitch(
@@ -128,13 +128,30 @@ class SettingsScreen(BaseScreen):
 
         apply_w = 180
         self.system_apply_btn = Button(
-            pygame.Rect(app.width // 2 - apply_w // 2, toggle_y + 60, apply_w, 42),
+            pygame.Rect(app.width // 2 - apply_w // 2, toggle_y + 180, apply_w, 42),
             text="Apply",
             bg_color=theme.DARK_GRAY,
             border_radius=10,
         )
         self.temp_unit_label = "°C / °F"
         self._saved_temp_unit = getattr(self.app, "temp_unit", "C")
+
+        # Sleep settings
+        self.sleep_toggle = ToggleSwitch(
+            self.app,
+            rect=(slider_x, toggle_y + 70, 60, 32),
+            default=self.app.ui_control.sleep_enabled
+        )
+        self.sleep_dropdown = DropDown(
+            self.app,
+            pygame.Rect(slider_x + 120, toggle_y + 70, 200, 40),
+            ["30 seconds", "5 minutes", "10 minutes", "30 minutes", "1 hour", "2 hours"],
+            default=self._sleep_time_label(self.app.ui_control.sleep_time),
+        )
+        self.sleep_dropdown._label_y = toggle_y + 46  # same as enable sleep label y
+        self.sleep_dropdown_visible = self.app.ui_control.sleep_enabled
+        self._saved_sleep_enabled = self.app.ui_control.sleep_enabled
+        self._saved_sleep_time = self.app.ui_control.sleep_time
 
         # ── Device tab widgets ─────────────────────────────────────────────
         self._build_device_list()
@@ -158,9 +175,43 @@ class SettingsScreen(BaseScreen):
         self.app.temp_unit = "F" if value else "C"
         self.system_unsaved = True
 
+    def _on_sleep_toggle_change(self, value):
+        self.app.ui_control.set_sleep_enabled(value)
+        self.sleep_dropdown_visible = value
+        self.system_unsaved = (value != self._saved_sleep_enabled)
+
+    def _on_sleep_time_change(self, label):
+        seconds = self._sleep_time_seconds(label)
+        self.app.ui_control.set_sleep_time(seconds)
+        self.system_unsaved = (seconds != self._saved_sleep_time)
+
+    def _sleep_time_label(self, seconds):
+        mapping = {
+            30: "30 seconds",
+            300: "5 minutes",
+            600: "10 minutes",
+            1800: "30 minutes",
+            3600: "1 hour",
+            7200: "2 hours"
+        }
+        return mapping.get(seconds, "30 seconds")
+
+    def _sleep_time_seconds(self, label):
+        mapping = {
+            "30 seconds": 30,
+            "5 minutes": 300,
+            "10 minutes": 600,
+            "30 minutes": 1800,
+            "1 hour": 3600,
+            "2 hours": 7200
+        }
+        return mapping.get(label, 30)
+
     def _apply_system(self):
         self._saved_brightness = self.brightness_value
         self._saved_temp_unit = self.app.temp_unit
+        self._saved_sleep_enabled = self.app.ui_control.sleep_enabled
+        self._saved_sleep_time = self.app.ui_control.sleep_time
         self.system_unsaved = False
         self.app.ui_control.set_brightness(self.brightness_value)
 
@@ -410,6 +461,11 @@ class SettingsScreen(BaseScreen):
             self.brightness_slider.value = self._saved_brightness
             self.app.temp_unit = self._saved_temp_unit
             self.temp_unit_toggle.value = (self._saved_temp_unit == "F")
+            self.app.ui_control.set_sleep_enabled(self._saved_sleep_enabled)
+            self.app.ui_control.set_sleep_time(self._saved_sleep_time)
+            self.sleep_toggle.value = self._saved_sleep_enabled
+            self.sleep_dropdown_visible = self._saved_sleep_enabled
+            self.sleep_dropdown.selected = self._sleep_time_label(self._saved_sleep_time)
             self.system_unsaved = False
         else:
             self._revert_name_change()
@@ -438,6 +494,13 @@ class SettingsScreen(BaseScreen):
             result = self.temp_unit_toggle.handle_event(event)
             if result is not None:
                 self._on_temp_unit_change(result)
+            result = self.sleep_toggle.handle_event(event)
+            if result is not None:
+                self._on_sleep_toggle_change(result)
+            if self.sleep_dropdown_visible:
+                result = self.sleep_dropdown.handle_event(event)
+                if result is not None:
+                    self._on_sleep_time_change(result)
 
         pos = utilities.get_event_pos(event, self.app)
         if pos is None:
@@ -672,10 +735,25 @@ class SettingsScreen(BaseScreen):
         f_y = toggle_y + (toggle_h - f_lbl.get_height()) // 2
         surface.blit(f_lbl, (self.temp_unit_toggle.rect.right + 10, f_y))
 
+        # Sleep toggle
+        sleep_toggle_y = toggle_y + 70
+        surface.blit(theme.FONT_SMALL.render("Enable Sleep", True, theme.WHITE), (self.slider_x, sleep_toggle_y - 24))
+        self.sleep_toggle.rect.y = sleep_toggle_y
+        self.sleep_toggle.draw(surface)
+
+        if self.sleep_dropdown_visible:
+            surface.blit(theme.FONT_SMALL.render("Sleep After", True, theme.WHITE), (self.slider_x + 120, self.sleep_dropdown._label_y))
+            self.sleep_dropdown.draw(surface)
+            self.sleep_dropdown.draw_expanded(surface)
+
         # Apply button: green when there's something to save, dark grey otherwise
         self.system_apply_btn.bg_color = (theme.GREEN if self.system_unsaved
                                           else theme.DARK_GRAY)
         self.system_apply_btn.draw(surface)
+
+        # Draw expanded dropdown on top
+        if self.sleep_dropdown_visible:
+            self.sleep_dropdown.draw_expanded(surface)
 
     def _draw_device_tab(self, surface):
         # Sidebar

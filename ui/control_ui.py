@@ -3,6 +3,7 @@
 import logging
 import os
 import json
+import time
 
 
 class ControlUI:
@@ -17,6 +18,12 @@ class ControlUI:
         self.simulate_brightness = settings.get("brightness", 100)
         self.on_pi = self.is_raspberry_pi()
         self.backlight_path = self._detect_backlight_path()
+
+        # Sleep states
+        self.sleep_enabled = settings.get("sleep_enabled", False)
+        self.sleep_time = settings.get("sleep_time", 30)  # default 30 seconds for testing
+        self.sleep_mode = False
+        self.last_activity = time.time()
 
     # Currently this command is executed in main, but later, it will be executed by run_ui function in this class
     def change_polling_rate(self, host, new_rate):
@@ -148,6 +155,9 @@ class ControlUI:
 
 
     def get_dimming_alpha(self):
+        if self.sleep_mode:
+            return 255  # full black for sleep
+
         # Prevent the screen from going completely black
         MIN_BRIGHTNESS = 10  # 0–100 scale
 
@@ -156,4 +166,25 @@ class ControlUI:
 
         # Convert brightness → alpha
         return int((100 - effective_brightness) * 2.55)
+
+    def set_sleep_enabled(self, enabled):
+        self.sleep_enabled = enabled
+        settings = self._load_ui_settings()
+        settings["sleep_enabled"] = enabled
+        self._save_ui_settings(settings)
+
+    def set_sleep_time(self, time_seconds):
+        self.sleep_time = time_seconds
+        settings = self._load_ui_settings()
+        settings["sleep_time"] = time_seconds
+        self._save_ui_settings(settings)
+
+    def update_activity(self):
+        self.last_activity = time.time()
+        self.sleep_mode = False
+
+    def check_sleep(self):
+        if self.sleep_enabled and not self.sleep_mode:
+            if time.time() - self.last_activity > self.sleep_time:
+                self.sleep_mode = True
  

@@ -22,6 +22,8 @@ def upload_key_async(key_path):
             headers={"Content-Type": "text/plain"},
             verify=False
         )
+
+
 script = "./Pairing/transfer.sh"
 p_script = "./Pairing/pb_transfer.sh"
 
@@ -46,6 +48,40 @@ class ControlPairing:
             s.close()
         return ip
     
+    def detect_os(self,host,user,key_path=None,password=None):
+        try:
+            if key_path:
+                print("Attempting key based connection")
+                con = Connection(host=host, user=user, connect_kwargs={"key_filename": key_path})
+            else:
+                print("Attempting pass based connection")
+                con = Connection(host=host, user=user, connect_kwargs={"password": password})
+
+            # Try Linux/macOS
+            print("performing Linux check")
+            result = con.run("uname", hide=True, warn=True)
+            if result.ok:
+                print("Linux Detected")
+                return "Linux"
+
+            # Try Windows
+            result = con.run("ver", hide=True, warn=True)
+            if result.ok:
+                print("Windows Detected")
+                return "Windows"
+
+            return "OS_Unknown"
+
+        except Exception as e:
+            print(f"[!] OS detection failed: {e}")
+            return "OS_Unknown"
+
+        finally:
+            print("OS detection finished")
+            try:
+                con.close()
+            except:
+                pass
 
     def add_node(self, node_config:dict):
         """Handle the add node event but activating transfer and returning device info"""
@@ -70,10 +106,11 @@ class ControlPairing:
             # Retrieve the hosts IP
             ip = self.get_ip()
             pdat = {"pairing_token": pairing_token,
-                f"Command": 'Curl -k -H "P-Key:{pairing_token}" "https://{ip}:8443/transfer" -o authorized_keys.pub'}
+                f"Command": 'Curl -k -H f"P-Key:{pairing_token}" f"https://{ip}:8443/transfer" -o authorized_keys.pub'}
             print(pairing_token)
             with open(self.config.pairing_info, "w") as f:
                 json.dump(pdat,f)
+            print("Publishing display token event")
             self.bus.publish("Display_token",pdat["Command"])
 
             # Start the endpoint using eh endpoint.py file
@@ -100,26 +137,10 @@ class ControlPairing:
                 status = response.json().get("stat")
 
                 if status == "retrieved":
-                    try:
-                        # Try Linux/macOS
-                        os_info = subprocess.check_output(
-                            [ "ssh", "-i", os.path.expanduser("~/.ssh/id_rsa"), f"{un}@{hn}", "cat /etc/os-release"],
-                            stderr=subprocess.DEVNULL,
-                            text=True
-                            )
-                        os_info = "Linux"
-                    except subprocess.CalledProcessError:
-                        try:
-                            # Try Windows
-                            os_info = subprocess.check_output(
-                            ["ssh", "-i", os.path.expanduser("~/.ssh/id_rsa"), f"{un}@{hn}", "ver"],
-                            stderr=subprocess.DEVNULL,
-                            text=True
-                            )
-                            os_info = "Windows"
-
-                        except subprocess.CalledProcessError:
-                            os_info = "OS_Unknown"
+                    os_info = self.detect_os_ssh(
+                                hn,un,
+                    key_path=os.path.expanduser("~/.ssh/id_rsa")
+                    )
                 else:
                     os_info = "OS_Unknown"
 
@@ -129,8 +150,7 @@ class ControlPairing:
                 flask_proc.wait()
 
 
-            node_config["operating_system"] = os_info.stdout.strip()
-            del node_config["pairing_mode"]
+            node_config["operating_system"] = os_info
             with open("device_list.json", "w") as f:
                 json.dump(node_config,f, indent=4)
 
@@ -138,28 +158,8 @@ class ControlPairing:
         elif node_config["pairing_mode"] == "Pass_auth":
             #Handles the password bassed ssh login if selected by the user
             print("Using password based authentication")
-            try:
-                con = Connection(host = hn, user = un, connect_kwargs={"password": pw})        
-                try:
-                    # Try Linux/macOS
-                    print("Trying linux check")
-                    result = con.run("cat /etc/os-release", hide=True)
-                    os_info = "Linux"
-                except Exception:
-                # Fallback to Windows
-                    try:
-                        print("Trying Windows check")
-                        result = con.run("Get-ComputerInfo", hide=True)
-                        os_info = "Windows"
-                    except Exception:
-                        os_info = "OS_Unknown"
-
-            except Exception as e:
-                print(f"[!] SSH connection failed: {e}")
-                os_info = "OS_Unknown"
-            finally:
-                con.close()
-
+            os_info = self.detect_os(hn,un,password=pw)          
+            node_config["operating_system"] = os_info
             with open("device_list.json", "w") as f:
                 json.dump(node_config,f, indent=4)
                 print("Saving node data to node config")

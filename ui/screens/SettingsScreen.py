@@ -576,6 +576,9 @@ class SettingsScreen(BaseScreen):
         if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN) and event.type != pygame.MOUSEWHEEL:
             return
 
+        if self.active_tab == TAB_DEVICE and self.selected_device:
+            pos = (pos[0], pos[1] - self.device_scroll)
+
         # ── Header ────────────────────────────────────────────────────────
         if self.back_btn.is_clicked(pos):
             self._go_home()

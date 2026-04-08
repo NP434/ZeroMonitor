@@ -55,7 +55,7 @@ class AddScreen(BaseScreen):
             title="Device Name"
         )
         self.passwordBox = Textbox(
-            rect=(711, 225, 300, 50),
+            rect=(711, 125, 300, 50),
             text="Enter Device Password",
             title="Password"
         )
@@ -150,19 +150,18 @@ class AddScreen(BaseScreen):
 
 
             if self.DeviceNameBox.is_clicked(pos):
-                if self.mode == "Endpoint":
-                    if self.active_textbox is not None:
-                        self.active_textbox.activate(False)
-                    self.DeviceNameBox.activate(True)
-                    self.active_textbox = self.DeviceNameBox
-                    self.keyboard.text_consumer = self.DeviceNameBox.consume
+                if self.active_textbox is not None:
+                    self.active_textbox.activate(False)
+                self.DeviceNameBox.activate(True)
+                self.active_textbox = self.DeviceNameBox
+                self.keyboard.text_consumer = self.DeviceNameBox.consume
                     
-                else:
-                    if self.active_textbox is not None:
-                        self.active_textbox.activate(False)
-                    self.passwordBox.activate(True)
-                    self.active_textbox = self.passwordBox
-                    self.keyboard.text_consumer = self.passwordBox.consume
+            if self.passwordBox.is_clicked(pos):
+                if self.active_textbox is not None:
+                    self.active_textbox.activate(False)
+                self.passwordBox.activate(True)
+                self.active_textbox = self.passwordBox
+                self.keyboard.text_consumer = self.passwordBox.consume
                     
 
             elif self.UserNameBox.is_clicked(pos):
@@ -220,14 +219,10 @@ class AddScreen(BaseScreen):
         mode = theme.DEFAULT_FONT.render("Pairing Mode", True, theme.WHITE)
         screen.blit(mode, (self.app.width / 2 - mode.get_width() / 2, 80))
 
-        if self.mode == 'Endpoint':
-            self.DeviceNameBox.draw(screen)
-            self.UserNameBox.draw(screen)
-            self.HostNameBox.draw(screen)
-        else:
-            self.UserNameBox.draw(screen)
-            self.HostNameBox.draw(screen)
-            self.passwordBox.draw(screen)
+        self.DeviceNameBox.draw(screen)
+        self.UserNameBox.draw(screen)
+        self.HostNameBox.draw(screen)
+        self.passwordBox.draw(screen)
 
         
 

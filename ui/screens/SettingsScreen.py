@@ -616,7 +616,10 @@ class SettingsScreen(BaseScreen):
         # Widget interactions
         if self.selected_device:
             for key, widget in self.device_settings_widgets:
+                original_y = widget.rect.y
+                widget.rect.y -= self.device_scroll
                 result = widget.handle_event(event)
+                widget.rect.y = original_y
 
                 # If nothing happens
                 if result is None:

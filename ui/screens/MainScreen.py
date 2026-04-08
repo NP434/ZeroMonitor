@@ -351,12 +351,13 @@ class MainScreen(BaseScreen):
             # Build a stable metric list with preferred order first, then any extras.
             ordered_metrics = []
             seen = set()
+            visible_metrics = self.selected_device.get("visible_metrics", self.METRIC_ORDER)
             for key in self.METRIC_ORDER:
-                if key in metrics:
+                if key in metrics and key in visible_metrics:
                     ordered_metrics.append((key, metrics.get(key)))
                     seen.add(key)
             for key, value in metrics.items():
-                if key not in seen:
+                if key not in seen and key in visible_metrics:
                     ordered_metrics.append((key, value))
 
             # Improved metric card grid with better spacing

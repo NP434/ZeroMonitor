@@ -51,6 +51,7 @@ class SettingsScreen(BaseScreen):
         self.unsaved_changes = False
         self.pending_name_change = None
         self.pending_polling_change = False
+        self._pending_backend_name = None
         self.sidebar_width = 220
         self.scroll_offset = 0
         self.show_custom_textbox = False
@@ -61,7 +62,7 @@ class SettingsScreen(BaseScreen):
         self.temp_name = ""
         self.device_scroll = 0
         self.device_settings_height = 0
-
+        self.original_visible_metrics = []
 
         # System-tab state
         self.system_unsaved = False
@@ -86,7 +87,7 @@ class SettingsScreen(BaseScreen):
             pygame.Rect(app.width - right_margin - tab_w, tab_y, tab_w, tab_h),
             text="Device",
             bg_color=theme.DARK_GRAY,
-            border_radius=19,          # fully rounded pill
+            border_radius=19,
         )
         self.tab_system_btn = Button(
             pygame.Rect(app.width - right_margin - tab_w * 2 - gap, tab_y, tab_w, tab_h),
@@ -99,9 +100,11 @@ class SettingsScreen(BaseScreen):
         #
         # Layout:
         #   CONTENT_Y + 20  →  section heading
-        #   CONTENT_Y + 60  →  "Brightness  50%" label
+        #   CONTENT_Y + 60  →  unsaved indicator (conditional)
         #   CONTENT_Y + 90  →  slider track
-        #   CONTENT_Y + 150 →  Apply button
+        #   slider_y + 110  →  temperature unit row
+        #   toggle_y + 70   →  sleep row
+        #   toggle_y + 180  →  Apply button
         #
         slider_x = app.width // 2 - 280
         slider_y = CONTENT_Y + 90
@@ -125,17 +128,8 @@ class SettingsScreen(BaseScreen):
         self.temp_unit_toggle = ToggleSwitch(
             self.app,
             rect=(slider_x, toggle_y, 60, 32),
-            default=False
+            default=getattr(self.app, "temp_unit", "C") == "F"
         )
-
-        apply_w = 180
-        self.system_apply_btn = Button(
-            pygame.Rect(app.width // 2 - apply_w // 2, toggle_y + 180, apply_w, 42),
-            text="Apply",
-            bg_color=theme.DARK_GRAY,
-            border_radius=10,
-        )
-        self.temp_unit_label = "°C / °F"
         self._saved_temp_unit = getattr(self.app, "temp_unit", "C")
 
         # Sleep settings
@@ -150,20 +144,29 @@ class SettingsScreen(BaseScreen):
             ["30 seconds", "5 minutes", "10 minutes", "30 minutes", "1 hour", "2 hours"],
             default=self._sleep_time_label(self.app.ui_control.sleep_time),
         )
-        self.sleep_dropdown._label_y = toggle_y + 46  # same as enable sleep label y
+        self.sleep_dropdown._label_y = toggle_y + 46
         self.sleep_dropdown_visible = self.app.ui_control.sleep_enabled
         self._saved_sleep_enabled = self.app.ui_control.sleep_enabled
         self._saved_sleep_time = self.app.ui_control.sleep_time
+
+        apply_w = 180
+        self.system_apply_btn = Button(
+            pygame.Rect(app.width // 2 - apply_w // 2, toggle_y + 180, apply_w, 42),
+            text="Apply",
+            bg_color=theme.DARK_GRAY,
+            border_radius=10,
+        )
 
         # ── Device tab widgets ─────────────────────────────────────────────
         self._build_device_list()
 
         self.device_apply_btn = Button(
-        pygame.Rect(10, app.height - 54, self.sidebar_width - 20, 42),
-        text="Apply Changes",
-        bg_color=theme.GREEN,
-        border_radius=10,
+            pygame.Rect(10, app.height - 54, self.sidebar_width - 20, 42),
+            text="Apply Changes",
+            bg_color=theme.GREEN,
+            border_radius=10,
         )
+
     # ══════════════════════════════════════════════════════════════════════
     # System tab
     # ══════════════════════════════════════════════════════════════════════
@@ -180,12 +183,12 @@ class SettingsScreen(BaseScreen):
     def _on_sleep_toggle_change(self, value):
         self.app.ui_control.set_sleep_enabled(value)
         self.sleep_dropdown_visible = value
-        self.system_unsaved = (value != self._saved_sleep_enabled)
+        self.system_unsaved = True
 
     def _on_sleep_time_change(self, label):
         seconds = self._sleep_time_seconds(label)
         self.app.ui_control.set_sleep_time(seconds)
-        self.system_unsaved = (seconds != self._saved_sleep_time)
+        self.system_unsaved = True
 
     def _sleep_time_label(self, seconds):
         mapping = {
@@ -208,29 +211,6 @@ class SettingsScreen(BaseScreen):
             "2 hours": 7200
         }
         return mapping.get(label, 30)
-
-    def _clamp_device_scroll(self):
-        max_scroll = max(0, self.device_settings_height - (self.app.height - CONTENT_Y))
-        self.device_scroll = max(0, min(self.device_scroll, max_scroll))
-
-    def _draw_device_scrollbar(self, surface):
-        if not self.selected_device or self.device_settings_height <= (self.app.height - CONTENT_Y):
-            return
-
-        scrollbar_width = 8
-        viewport_rect = pygame.Rect(self.sidebar_width, CONTENT_Y, self.app.width - self.sidebar_width, self.app.height - CONTENT_Y)
-        scrollbar_x = viewport_rect.right - scrollbar_width
-        scrollbar_height = viewport_rect.height
-        max_scroll = max(0, self.device_settings_height - (self.app.height - CONTENT_Y))
-
-        thumb_height = max(20, scrollbar_height * ((self.app.height - CONTENT_Y) / self.device_settings_height))
-        thumb_y = viewport_rect.y + (self.device_scroll / max(1, max_scroll)) * (scrollbar_height - thumb_height) if max_scroll > 0 else viewport_rect.y
-
-        # Draw track
-        pygame.draw.rect(surface, theme.GRAY, (scrollbar_x, viewport_rect.y, scrollbar_width, scrollbar_height), border_radius=4)
-
-        # Draw thumb
-        pygame.draw.rect(surface, theme.BLUE, (scrollbar_x, thumb_y, scrollbar_width, thumb_height), border_radius=4)
 
     def _apply_system(self):
         self._saved_brightness = self.brightness_value
@@ -269,6 +249,23 @@ class SettingsScreen(BaseScreen):
                 return d
         return None
 
+    def _collect_widget_state(self):
+        """Write all current widget values into the device dict without sending to backend."""
+        if not self.selected_device:
+            return
+        device = self._get_device(self.selected_device)
+        if not device:
+            return
+
+        visible_metrics = []
+        for key, widget in self.device_settings_widgets:
+            if key.startswith("visible_"):
+                if widget.value:
+                    visible_metrics.append(key[8:])
+            elif key == "polling_paused":
+                device["polling_paused"] = widget.value
+        device["visible_metrics"] = visible_metrics
+
     def _build_settings_widgets(self):
         """Rebuild right-panel widgets for the currently selected device."""
         self.device_settings_widgets = []
@@ -286,12 +283,9 @@ class SettingsScreen(BaseScreen):
             return
         panel_x = self.sidebar_width + 40
 
-        # Each setting row occupies a label + widget block.
-        # Label sits SETTING_ROW_H px below CONTENT_Y,
-        # widget sits LABEL_H px below that — no overlap possible.
-        FIRST_ROW_Y = CONTENT_Y + 80   # first setting row (below device heading)
-        LABEL_H     = 26               # height reserved for the label text
-        ROW_STRIDE  = 80               # vertical distance between row starts
+        FIRST_ROW_Y = CONTENT_Y + 80
+        LABEL_H     = 26
+        ROW_STRIDE  = 80
 
         row_y = FIRST_ROW_Y
 
@@ -305,12 +299,11 @@ class SettingsScreen(BaseScreen):
             ["Low", "Medium", "High", "Custom"],
             default=default_label,
         )
-        poll_dropdown._label_y = row_y   # draw() uses this for the label
+        poll_dropdown._label_y = row_y
 
         self.device_settings_widgets.append(("poll_rate", poll_dropdown))
         row_y += ROW_STRIDE
 
-        # If custom, activate the textbox
         if default_label == "Custom":
             self._activate_custom_polling()
 
@@ -364,14 +357,15 @@ class SettingsScreen(BaseScreen):
         if not self.unsaved_changes or not self.selected_device:
             return
 
+        # Flush all widget state to device dict first
+        self._collect_widget_state()
+
         device = self._get_device(self.selected_device)
         if not device:
             return
 
-        # Determine backend identity for REST actions
+        # Capture backend name once before anything mutates it
         backend_name = self.original_name if self.pending_name_change else self.selected_device
-
-        # Apply polling + pause updates
         has_polling_update = False
 
         for key, widget in self.device_settings_widgets:
@@ -394,24 +388,22 @@ class SettingsScreen(BaseScreen):
                     device["polling_paused"] = widget.value
                     self.app.bus.publish("SYNC_VAULT", {})
 
-        # Apply visible metrics
-        visible_metrics = []
-        for key, widget in self.device_settings_widgets:
-            if key.startswith("visible_"):
-                metric = key[8:]
-                if widget.value:
-                    visible_metrics.append(metric)
+        # Apply visible metrics immediately — no ack needed
+        visible_metrics = [
+            key[8:] for key, widget in self.device_settings_widgets
+            if key.startswith("visible_") and widget.value
+        ]
         device["visible_metrics"] = visible_metrics
         self.app.bus.publish("SYNC_VAULT", {})
 
         self.pending_polling_change = has_polling_update
 
-        # If the name is pending and there is a polling update, keep it pending until poll ack.
         if self.pending_polling_change:
+            # Store backend name so ack handler can match correctly
+            self._pending_backend_name = backend_name
             self.unsaved_changes = True
             return
 
-        # Execute device rename now if pending
         if self.pending_name_change:
             old_name, new_name = self.pending_name_change
             self._commit_name_change(old_name, new_name)
@@ -456,6 +448,27 @@ class SettingsScreen(BaseScreen):
         self.pending_name_change = None
         self.pending_polling_change = False
 
+    def _clamp_device_scroll(self):
+        max_scroll = max(0, self.device_settings_height - (self.app.height - CONTENT_Y))
+        self.device_scroll = max(0, min(self.device_scroll, max_scroll))
+
+    def _draw_device_scrollbar(self, surface):
+        if not self.selected_device or self.device_settings_height <= (self.app.height - CONTENT_Y):
+            return
+
+        scrollbar_width = 8
+        viewport_rect = pygame.Rect(self.sidebar_width, CONTENT_Y, self.app.width - self.sidebar_width, self.app.height - CONTENT_Y)
+        scrollbar_x = viewport_rect.right - scrollbar_width
+        scrollbar_height = viewport_rect.height
+        max_scroll = max(0, self.device_settings_height - (self.app.height - CONTENT_Y))
+
+        thumb_height = max(20, scrollbar_height * ((self.app.height - CONTENT_Y) / self.device_settings_height))
+        thumb_y = (viewport_rect.y + (self.device_scroll / max(1, max_scroll)) * (scrollbar_height - thumb_height)
+                   if max_scroll > 0 else viewport_rect.y)
+
+        pygame.draw.rect(surface, theme.GRAY, (scrollbar_x, viewport_rect.y, scrollbar_width, scrollbar_height), border_radius=4)
+        pygame.draw.rect(surface, theme.BLUE, (scrollbar_x, thumb_y, scrollbar_width, thumb_height), border_radius=4)
+
     # ══════════════════════════════════════════════════════════════════════
     # Tab switching
     # ══════════════════════════════════════════════════════════════════════
@@ -466,7 +479,7 @@ class SettingsScreen(BaseScreen):
         unsaved = self.system_unsaved if self.active_tab == TAB_SYSTEM else self.unsaved_changes
         if unsaved:
             self._pending_action = lambda: self._do_switch_tab(tab)
-            msg = ("Apply brightness before switching?"
+            msg = ("Apply settings before switching?"
                    if self.active_tab == TAB_SYSTEM
                    else "Apply changes before switching?")
             self._open_confirm(msg)
@@ -486,7 +499,7 @@ class SettingsScreen(BaseScreen):
         unsaved = self.system_unsaved if self.active_tab == TAB_SYSTEM else self.unsaved_changes
         if unsaved:
             self._pending_action = lambda: self.app.change_screen("main")
-            msg = ("Apply brightness before leaving?"
+            msg = ("Apply settings before leaving?"
                    if self.active_tab == TAB_SYSTEM
                    else "Apply changes before leaving?")
             self._open_confirm(msg)
@@ -526,7 +539,9 @@ class SettingsScreen(BaseScreen):
             self.system_unsaved = False
         else:
             self._revert_name_change()
-            device["visible_metrics"] = self.original_visible_metrics
+            device = self._get_device(self.selected_device)
+            if device:
+                device["visible_metrics"] = self.original_visible_metrics.copy()
             self.unsaved_changes = False
             self._build_settings_widgets()
         self._run_pending()
@@ -546,7 +561,7 @@ class SettingsScreen(BaseScreen):
             self.confirm_popup.handle_event(event)
             return
 
-        # Slider needs all event types (drag / motion), not just clicks
+        # Slider and system toggles need all event types (drag/motion)
         if self.active_tab == TAB_SYSTEM:
             self.brightness_slider.handle_event(event)
             result = self.temp_unit_toggle.handle_event(event)
@@ -560,8 +575,7 @@ class SettingsScreen(BaseScreen):
                 if result is not None:
                     self._on_sleep_time_change(result)
 
-        pos = utilities.get_event_pos(event, self.app)
-
+        # Scroll handling
         if event.type == pygame.MOUSEWHEEL and self.active_tab == TAB_DEVICE and self.selected_device:
             self.device_scroll -= event.y * 20
             self._clamp_device_scroll()
@@ -570,16 +584,14 @@ class SettingsScreen(BaseScreen):
             self.device_scroll -= event.dy * 200
             self._clamp_device_scroll()
 
+        pos = utilities.get_event_pos(event, self.app)
         if pos is None:
             return
 
-        if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN) and event.type != pygame.MOUSEWHEEL:
+        if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN):
             return
 
-        if self.active_tab == TAB_DEVICE and self.selected_device:
-            pos = (pos[0], pos[1] - self.device_scroll)
-
-        # ── Header ────────────────────────────────────────────────────────
+        # ── Header (always use raw pos) ───────────────────────────────────
         if self.back_btn.is_clicked(pos):
             self._go_home()
             return
@@ -592,11 +604,6 @@ class SettingsScreen(BaseScreen):
             self._switch_tab(TAB_DEVICE)
             return
 
-        # Check edit button before pos adjustment for scrolling
-        if self.active_tab == TAB_DEVICE and self.selected_device and hasattr(self, 'edit_btn_rect') and self.edit_btn_rect.collidepoint(pos):
-            self._start_name_edit()
-            return
-
         # ── System tab ────────────────────────────────────────────────────
         if self.active_tab == TAB_SYSTEM:
             if self.system_unsaved and self.system_apply_btn.is_clicked(pos):
@@ -604,7 +611,18 @@ class SettingsScreen(BaseScreen):
             return
 
         # ── Device tab ────────────────────────────────────────────────────
-        # Device selection
+
+        # Edit button is drawn at fixed position — use raw pos
+        if self.selected_device and hasattr(self, 'edit_btn_rect') and self.edit_btn_rect.collidepoint(pos):
+            self._start_name_edit()
+            return
+
+        # Apply button is fixed position — use raw pos
+        if self.device_apply_btn.is_clicked(pos):
+            self._apply_device()
+            return
+
+        # Device selection buttons in sidebar — use raw pos
         for name, btn in self.device_buttons.items():
             r = btn.rect.move(0, self.scroll_offset)
             if r.collidepoint(pos):
@@ -613,19 +631,23 @@ class SettingsScreen(BaseScreen):
                 self._build_settings_widgets()
                 return
 
-        # Widget interactions
+        # Widget interactions — compensate for scroll by adjusting pos
         if self.selected_device:
-            for key, widget in self.device_settings_widgets:
-                original_y = widget.rect.y
-                widget.rect.y -= self.device_scroll
-                result = widget.handle_event(event)
-                widget.rect.y = original_y
+            scrolled_pos = (pos[0], pos[1] + self.device_scroll)
 
-                # If nothing happens
+            for key, widget in self.device_settings_widgets:
+                result = widget.handle_event_at(scrolled_pos) if hasattr(widget, 'handle_event_at') else widget.handle_event(event)
+
+                if result is None:
+                    # Fall back to rect-based check with scrolled pos
+                    original_y = widget.rect.y
+                    widget.rect.y -= self.device_scroll
+                    result = widget.handle_event(event)
+                    widget.rect.y = original_y
+
                 if result is None:
                     continue
-                
-                # If widget is the poll_rate widget
+
                 if key == "poll_rate":
                     if result == "Custom":
                         self._activate_custom_polling()
@@ -633,32 +655,25 @@ class SettingsScreen(BaseScreen):
                     else:
                         self._deactivate_custom_polling()
 
-                # Normal data collection from widgets
                 device = self._get_device(self.selected_device)
-                device[key] = result
+                if device:
+                    device[key] = result
                 self.unsaved_changes = True
-        
-        # If custom textbox is visible, check if user clicked it
-        if self.show_custom_textbox:
-            if self.custom_textbox.rect.collidepoint(pos):
-                self.show_numpad = True
-            else:
-                pass
 
-        # Handle numpad events if visible
-        if self.show_numpad:
-            self.numpad.handle_event(pos)
+            # Custom textbox / numpad
+            if self.show_custom_textbox:
+                if self.custom_textbox.rect.collidepoint(scrolled_pos):
+                    self.show_numpad = True
 
-        # Handle name keyboard
+            if self.show_numpad:
+                self.numpad.handle_event(scrolled_pos)
+
+        # Name keyboard (drawn fixed, use raw pos)
         if self.editing_name and self.name_keyboard:
             if self.name_keyboard.handle_event(pos):
                 return
 
-        if self.device_apply_btn.is_clicked(pos):
-            self._apply_device()
-
     def _activate_custom_polling(self):
-        # Find dropdown rect
         dropdown_rect = None
         for key, widget in self.device_settings_widgets:
             if key == "poll_rate":
@@ -668,14 +683,12 @@ class SettingsScreen(BaseScreen):
         if dropdown_rect is None:
             dropdown_rect = pygame.Rect(400, 200, 200, 40)
 
-        # Create textbox if needed
         self.custom_textbox = Textbox(
             rect=pygame.Rect(dropdown_rect.right + 40, dropdown_rect.y, 150, 40),
             text="",
             title="Custom Polling"
         )
 
-        # Create numpad if needed
         self.numpad = Numpad(
             x=self.custom_textbox.rect.right + 20,
             y=self.custom_textbox.rect.y,
@@ -683,14 +696,12 @@ class SettingsScreen(BaseScreen):
         )
 
         self.show_custom_textbox = True
-        self.show_numpad = False 
+        self.show_numpad = False
 
-        # Set textbox to current value
         device = self._get_device(self.selected_device)
         current_seconds = device.get("polling_frequency", 15)
         self.custom_textbox.txt = str(current_seconds)
-        self.custom_error_message = None 
-
+        self.custom_error_message = None
 
     def _deactivate_custom_polling(self):
         self.show_custom_textbox = False
@@ -709,6 +720,7 @@ class SettingsScreen(BaseScreen):
             new_name = self.temp_name.strip()
             old_name = self.selected_device
             if new_name and new_name != old_name:
+                self._collect_widget_state()  # save widget state before name edit commits
                 self.pending_name_change = (old_name, new_name)
                 self.temp_name = new_name
                 self.unsaved_changes = True
@@ -732,17 +744,14 @@ class SettingsScreen(BaseScreen):
                     self.unsaved_changes = True
                     self.custom_error_message = None
                 else:
-                    # Invalid range, reset to current value
                     self.custom_textbox.txt = str(device.get("polling_frequency", 15))
                     self.custom_error_message = "Must be 5-6000"
             except ValueError:
-                # Invalid input, reset to current value
                 self.custom_textbox.txt = str(device.get("polling_frequency", 15))
                 self.custom_error_message = "Must be 5-6000"
             self.show_numpad = False
             return
         else:
-            # Append digit
             self.custom_textbox.consume(key)
 
     # ══════════════════════════════════════════════════════════════════════
@@ -780,21 +789,18 @@ class SettingsScreen(BaseScreen):
         surface.blit(heading, (self.app.width // 2 - heading.get_width() // 2,
                                 CONTENT_Y + 20))
 
-        # Unsaved indicator (same style as device tab)
         if self.system_unsaved:
             dot = theme.FONT_SMALL.render("● unsaved changes", True, theme.YELLOW)
             surface.blit(dot, (self.app.width // 2 - dot.get_width() // 2,
                             CONTENT_Y + 46))
 
-
-
         self.brightness_slider.draw(surface)
 
+        # ── Temperature unit row ──────────────────────────────────────────
         is_fahrenheit = self.app.temp_unit == "F"
-
         c_lbl = theme.FONT_SMALL.render("°C", True, theme.WHITE if not is_fahrenheit else theme.LIGHT_GRAY)
         f_lbl = theme.FONT_SMALL.render("°F", True, theme.WHITE if is_fahrenheit else theme.LIGHT_GRAY)
-        row_label = theme.FONT_SMALL.render("Temperature Unit", True, theme.WHITE)
+        row_label = theme.FONT_SMALL.render("Temperature Unit", True, theme.LIGHT_GRAY)
 
         toggle_y = self.temp_unit_toggle.rect.y
         toggle_h = self.temp_unit_toggle.rect.height
@@ -808,23 +814,25 @@ class SettingsScreen(BaseScreen):
         f_y = toggle_y + (toggle_h - f_lbl.get_height()) // 2
         surface.blit(f_lbl, (self.temp_unit_toggle.rect.right + 10, f_y))
 
-        # Sleep toggle
+        # ── Sleep row ─────────────────────────────────────────────────────
         sleep_toggle_y = toggle_y + 70
-        surface.blit(theme.FONT_SMALL.render("Enable Sleep", True, theme.WHITE), (self.slider_x, sleep_toggle_y - 24))
+        surface.blit(theme.FONT_SMALL.render("Enable Sleep", True, theme.LIGHT_GRAY),
+                     (self.slider_x, sleep_toggle_y - 24))
+        self.sleep_toggle.rect.x = self.slider_x
         self.sleep_toggle.rect.y = sleep_toggle_y
         self.sleep_toggle.draw(surface)
 
         if self.sleep_dropdown_visible:
-            surface.blit(theme.FONT_SMALL.render("Sleep After", True, theme.WHITE), (self.slider_x + 120, self.sleep_dropdown._label_y))
+            surface.blit(theme.FONT_SMALL.render("Sleep After", True, theme.LIGHT_GRAY),
+                         (self.slider_x + 120, self.sleep_dropdown._label_y))
             self.sleep_dropdown.draw(surface)
-            self.sleep_dropdown.draw_expanded(surface)
 
-        # Apply button: green when there's something to save, dark grey otherwise
+        # Apply button
         self.system_apply_btn.bg_color = (theme.GREEN if self.system_unsaved
                                           else theme.DARK_GRAY)
         self.system_apply_btn.draw(surface)
 
-        # Draw expanded dropdown on top
+        # Draw expanded sleep dropdown on top of everything
         if self.sleep_dropdown_visible:
             self.sleep_dropdown.draw_expanded(surface)
 
@@ -843,9 +851,6 @@ class SettingsScreen(BaseScreen):
                                  border_radius=20, width=2)
             btn.draw(surface, override_rect=r)
 
-        if self.show_custom_textbox:
-            self.custom_textbox.draw(surface)
-
         self.device_apply_btn.draw(surface)
 
         # Right panel
@@ -856,17 +861,14 @@ class SettingsScreen(BaseScreen):
             surface.blit(hint, (self.sidebar_width + 40, CONTENT_Y + 30))
             return
 
-        # Device name heading (show pending name if queued)
+        # Device name heading
         current_display_name = self.pending_name_change[1] if self.pending_name_change else self.selected_device
-        heading = theme.FONT_MEDIUM.render(
-            current_display_name, True, theme.BRIGHT_BLUE
-        )
+        heading = theme.FONT_MEDIUM.render(current_display_name, True, theme.BRIGHT_BLUE)
         surface.blit(heading, (self.sidebar_width + 40, CONTENT_Y + 12))
 
         # Edit button
         if "edit.png" in self.assets:
             edit_icon = pygame.transform.smoothscale(self.assets["edit.png"], (24, 24))
-            # Make the icon white
             white_icon = pygame.Surface(edit_icon.get_size(), pygame.SRCALPHA)
             white_icon.fill((255, 255, 255, 255))
             white_icon.blit(edit_icon, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
@@ -880,27 +882,29 @@ class SettingsScreen(BaseScreen):
             dot = theme.FONT_SMALL.render("● unsaved changes", True, theme.YELLOW)
             surface.blit(dot, (self.sidebar_width + 40, CONTENT_Y + 46))
 
-        # Settings widgets — label rendered at widget._label_y, widget below it
+        # Settings widgets
         open_dropdowns = []
+        viewport = pygame.Rect(self.sidebar_width, CONTENT_Y,
+                               self.app.width - self.sidebar_width,
+                               self.app.height - CONTENT_Y)
 
         for key, widget in self.device_settings_widgets:
             label_text = self._get_label_for_key(key)
             label_y = getattr(widget, "_label_y", widget.rect.y - 24) - self.device_scroll
-            if label_y > HEADER_H + 20 and label_y < self.app.height:
+
+            if HEADER_H + 20 < label_y < self.app.height:
                 lbl = theme.FONT_SMALL.render(label_text, True, theme.WHITE)
                 surface.blit(lbl, (widget.rect.x, label_y))
 
-            # Temporarily adjust rect for scrolling
             original_y = widget.rect.y
             widget.rect.y -= self.device_scroll
-            if widget.rect.y > HEADER_H + 20 and widget.rect.colliderect(pygame.Rect(self.sidebar_width, CONTENT_Y, self.app.width - self.sidebar_width, self.app.height - CONTENT_Y)):
+            if widget.rect.y > HEADER_H + 20 and widget.rect.colliderect(viewport):
                 widget.draw(surface)
             widget.rect.y = original_y
 
-            # If it's a dropdown and it's open, save it for later
             if isinstance(widget, DropDown) and widget.expanded:
                 open_dropdowns.append(widget)
-        
+
         if self.show_custom_textbox:
             self.custom_textbox.draw(surface)
         if self.show_numpad:
@@ -912,15 +916,13 @@ class SettingsScreen(BaseScreen):
 
         if self.editing_name and self.name_keyboard:
             self.name_keyboard.draw(surface)
-            # Draw current temp name
             name_text = theme.FONT_MEDIUM.render(f"New Name: {self.temp_name}", True, theme.WHITE)
             surface.blit(name_text, (self.app.width // 2 - name_text.get_width() // 2, 250))
 
-        # Draw open dropdown menus LAST so they appear on top
+        # Draw open dropdowns on top
         for dd in open_dropdowns:
             dd.rect.y -= self.device_scroll
             dd.draw_expanded(surface)
             dd.rect.y += self.device_scroll
 
-        # Draw scrollbar
         self._draw_device_scrollbar(surface)

@@ -47,7 +47,7 @@ class AddScreen(BaseScreen):
         self.HostNameBox = Textbox(
             rect=(41, 225, 300, 50),
             text="Enter Host Name",
-            title="Hostname"
+            title="Device IP"
         )
         self.DeviceNameBox = Textbox(
             rect=(711, 225, 300, 50),

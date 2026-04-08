@@ -137,7 +137,7 @@ class ControlPairing:
                 status = response.json().get("stat")
 
                 if status == "retrieved":
-                    os_info = self.detect_os_ssh(
+                    os_info = self.detect_os(
                                 hn,un,
                     key_path=os.path.expanduser("~/.ssh/id_rsa")
                     )

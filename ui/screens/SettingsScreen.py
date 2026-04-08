@@ -567,7 +567,7 @@ class SettingsScreen(BaseScreen):
             self._clamp_device_scroll()
 
         if event.type == pygame.FINGERMOTION and self.active_tab == TAB_DEVICE and self.selected_device:
-            self.device_scroll -= event.dy * 100
+            self.device_scroll -= event.dy * 200
             self._clamp_device_scroll()
 
         if pos is None:

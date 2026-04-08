@@ -1,4 +1,12 @@
 [run]
+source =
+    datainterpreter
+    driver
+    event_bus
+    network_manager
+    paths
+    polling_agent
+    security_manager
 omit =
     tests/*
     *_test.py

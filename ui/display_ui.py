@@ -62,12 +62,6 @@ class DisplayUI:
 
         # For DEV MODE and Pathing
         self.config = config 
-        # Load Devices safely using Config Paths
-        self.devices = []
-        if os.path.exists(self.config.decrypted_list):
-            with open(self.config.decrypted_list, "r", encoding='utf-8') as file:
-                device_data = json.load(file)
-                self.devices = list(device_data.values())
 
         # Event subscriptions
         self.bus.subscribe("STOP_SYSTEM", self._handle_stop_system)
@@ -91,6 +85,9 @@ class DisplayUI:
             with open(self.config.decrypted_list, "r", encoding='utf-8') as file:
                 device_data = json.load(file)
                 self.devices = list(device_data.values())
+
+        # User Temperature Preference
+        self.temp_unit = "C"
 
         # Register screens
         init_screen = InitScreen(self)
@@ -299,12 +296,27 @@ class DisplayUI:
                 if event.type == pygame.QUIT:
                     self.shutdown()
 
+                # Update activity on touch
+                if event.type in (pygame.MOUSEBUTTONDOWN, pygame.FINGERDOWN):
+                    self.ui_control.update_activity()
+
                 # Send events to the active screen to be handled
                 self.current_screen.handle_event(event)
             
             # Update and draw the active screen  
             self.current_screen.update()
             self.current_screen.draw(self.screen)
+
+            # Check for sleep
+            self.ui_control.check_sleep()
+
+            # Apply dimming overlay
+            alpha = self.ui_control.get_dimming_alpha()
+            if alpha > 0:
+                overlay = pygame.Surface((self.width, self.height))
+                overlay.fill((0, 0, 0))
+                overlay.set_alpha(alpha)
+                self.screen.blit(overlay, (0, 0))
 
             pygame.display.flip()
 

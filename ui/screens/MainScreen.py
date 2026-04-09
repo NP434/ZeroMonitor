@@ -7,6 +7,7 @@ from ui.widgets.Button import Button
 from ui.widgets.SidebarPanel import SidebarPanel
 from ui.widgets.ConfirmationPopup import ConfirmationPopup
 import ui.theme as theme
+import ui.utilities as utilities
 
 
 class MainScreen(BaseScreen):
@@ -350,12 +351,13 @@ class MainScreen(BaseScreen):
             # Build a stable metric list with preferred order first, then any extras.
             ordered_metrics = []
             seen = set()
+            visible_metrics = self.selected_device.get("visible_metrics", self.METRIC_ORDER)
             for key in self.METRIC_ORDER:
-                if key in metrics:
+                if key in metrics and key in visible_metrics:
                     ordered_metrics.append((key, metrics.get(key)))
                     seen.add(key)
             for key, value in metrics.items():
-                if key not in seen:
+                if key not in seen and key in visible_metrics:
                     ordered_metrics.append((key, value))
 
             # Improved metric card grid with better spacing
@@ -392,7 +394,7 @@ class MainScreen(BaseScreen):
 
                 friendly_name = self.METRIC_NAMES.get(metric_name, metric_name.replace("_", " ").title())
                 severity = severities.get(metric_name, "normal")
-                value_text = self._format_metric_value(metric_name, metric_value)
+                value_text = utilities.format_metric_value(metric_name, metric_value)
                 self._draw_metric_card(surface, rect, friendly_name, value_text, severity)
 
             surface.set_clip(old_clip)
@@ -441,35 +443,6 @@ class MainScreen(BaseScreen):
             date_part, time_part = timestamp.split("T", 1)
             return f"{date_part} {time_part.split('.')[0]}"
         return str(timestamp)
-
-    def _format_metric_value(self, metric_name, metric_value):
-        if metric_value is None:
-            return "N/A"
-
-        if metric_name == "uptime_seconds":
-            total = int(metric_value)
-            days = total // 86400
-            hours = (total % 86400) // 3600
-            mins = (total % 3600) // 60
-            if days > 0:
-                return f"{days}d {hours}h {mins}m"
-            return f"{hours}h {mins}m"
-
-        if metric_name in {"net_rx_kbps", "net_tx_kbps"}:
-            if metric_value >= 1000:
-                return f"{metric_value / 1000.0:.2f} Mbps"
-            return f"{metric_value:.0f} kbps"
-
-        if metric_name in {"mem_used_mb", "mem_total_mb"}:
-            return f"{int(metric_value)}{self.METRIC_UNITS.get(metric_name, '')}"
-
-        if metric_name == "cpu_load_1m":
-            return f"{metric_value:.2f}"
-
-        if isinstance(metric_value, float):
-            return f"{metric_value:.2f}{self.METRIC_UNITS.get(metric_name, '')}"
-
-        return f"{metric_value}{self.METRIC_UNITS.get(metric_name, '')}"
 
     def _draw_metric_card(self, surface, rect, label, value, severity):
         severity_color = theme.STATUS_COLORS.get(severity, theme.WHITE)

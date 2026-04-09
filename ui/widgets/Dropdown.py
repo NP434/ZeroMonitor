@@ -12,6 +12,8 @@ class DropDown:
 
         self.option_height = rect.height
         self.font = theme.FONT_MEDIUM
+        self.max_visible = 5
+        self.scroll_offset = 0
 
     def is_clicked(self, pos):
         return self.rect.collidepoint(pos)
@@ -19,12 +21,17 @@ class DropDown:
     def handle_event(self, event):
         pos = utilities.get_event_pos(event, self.app)
 
+        if event.type == pygame.MOUSEWHEEL and self.expanded:
+            self.scroll_offset = max(0, min(self.scroll_offset - event.y, max(0, len(self.options) - self.max_visible)))
+            return None
+
         if event.type not in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
             return
 
         # Toggle open/close when clicking the collapsed box
         if self.is_clicked(pos):
             self.expanded = not self.expanded
+            self.scroll_offset = 0  # reset scroll when opening
             return None
 
         # Handle option clicks when open
@@ -33,9 +40,10 @@ class DropDown:
 
             # If click inside menu
             if menu_rect.collidepoint(pos):
+                visible_options = self.options[self.scroll_offset:self.scroll_offset + self.max_visible]
                 index = (pos[1] - menu_rect.y) // self.option_height
-                if 0 <= index < len(self.options):
-                    self.selected = self.options[index]
+                if 0 <= index < len(visible_options):
+                    self.selected = visible_options[index]
                     self.expanded = False
                     return self.selected
 
@@ -69,14 +77,20 @@ class DropDown:
         if not self.expanded:
             return
 
-        menu_rect = self._expanded_rect()
+        visible_options = self.options[self.scroll_offset:self.scroll_offset + self.max_visible]
+        menu_rect = pygame.Rect(
+            self.rect.x,
+            self.rect.y + self.rect.height,
+            self.rect.width,
+            len(visible_options) * self.option_height
+        )
 
         # Background
         pygame.draw.rect(surface, theme.GRAY, menu_rect, border_radius=10)
         pygame.draw.rect(surface, theme.WHITE, menu_rect, width=2, border_radius=10)
 
         # Options
-        for i, opt in enumerate(self.options):
+        for i, opt in enumerate(visible_options):
             opt_rect = pygame.Rect(
                 menu_rect.x,
                 menu_rect.y + i * self.option_height,
@@ -96,9 +110,10 @@ class DropDown:
     # ------------------------------------------------------------
     def _expanded_rect(self):
         """Rectangle for the expanded menu."""
+        visible_count = min(self.max_visible, len(self.options) - self.scroll_offset)
         return pygame.Rect(
             self.rect.x,
             self.rect.y + self.rect.height,
             self.rect.width,
-            self.option_height * len(self.options)
+            self.option_height * visible_count
         )

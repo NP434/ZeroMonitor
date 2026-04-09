@@ -1,7 +1,21 @@
+import os
+os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+
 import json
 from types import SimpleNamespace
 
+import pygame
 import pytest
+
+
+@pytest.fixture(scope="session", autouse=True)
+def pygame_headless():
+    pygame.init()
+    if not pygame.display.get_surface():
+        pygame.display.set_mode((1, 1))
+    yield
+    pygame.quit()
 
 
 class FakeBus:
@@ -54,3 +68,40 @@ def temp_config(tmp_path):
 
     return cfg
 
+
+@pytest.fixture
+def ui_surface():
+    return pygame.Surface((1024, 600))
+
+
+@pytest.fixture
+def ui_app(fake_bus, temp_config):
+    class DummyUIControl:
+        def __init__(self, bus):
+            self.bus = bus
+            self.added = []
+            self.stopped = False
+
+        def add_node(self, node_config):
+            self.added.append(node_config)
+            self.bus.publish("UI_ADD_NODE", node_config)
+
+        def stop_system(self):
+            self.stopped = True
+            self.bus.publish("STOP_SYSTEM", None)
+
+    class DummyApp(SimpleNamespace):
+        def __init__(self):
+            super().__init__(
+                width=1024,
+                height=600,
+                bus=fake_bus,
+                config=temp_config,
+                ui_control=DummyUIControl(fake_bus),
+                changed_screens=[],
+            )
+
+        def change_screen(self, name):
+            self.changed_screens.append(name)
+
+    return DummyApp()

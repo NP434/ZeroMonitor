@@ -4,6 +4,7 @@ import json
 import os
 from ui.screens.BaseScreen import BaseScreen
 from ui.widgets.Button import Button
+from ui.widgets.Dropdown import DropDown
 import ui.theme as theme
 
 
@@ -130,6 +131,14 @@ class SystemDashboardScreen(BaseScreen):
             font=theme.FONT_SMALL,
         )
         self._load_cache_data()
+        self.selected_graph_device = None
+        self.device_selector = DropDown(
+            self.app,
+            pygame.Rect(0, 0, 180, 28),
+            ["No devices"],
+            default="No devices",
+        )
+        self._refresh_graph_device_selector()
 
     def _load_cache_data(self):
         """Load cache data from cache_data.json"""
@@ -202,39 +211,82 @@ class SystemDashboardScreen(BaseScreen):
         return total, online, offline
 
     def _get_history_key(self):
-        if not self.cache_data:
+        if not self.cache_data or not self.selected_graph_device:
             return None
 
-        return tuple(
-            sorted(
-                (
-                    device_name,
-                    device_data.get("timestamp"),
-                    device_data.get("status"),
-                    device_data.get("success"),
-                )
-                for device_name, device_data in self.cache_data.items()
-            )
+        device_data = self.cache_data.get(self.selected_graph_device)
+        if not isinstance(device_data, dict):
+            return None
+
+        return (
+            self.selected_graph_device,
+            device_data.get("timestamp"),
+            device_data.get("status"),
+            device_data.get("success"),
         )
 
+    def _refresh_graph_device_selector(self):
+        device_names = [d.get("name") for d in self.app.devices if d.get("name")]
+        cache_names = [name for name in self.cache_data.keys() if name]
+
+        ordered = []
+        seen = set()
+        for name in device_names + cache_names:
+            if name not in seen:
+                seen.add(name)
+                ordered.append(name)
+
+        options = ordered or ["No devices"]
+        self.device_selector.options = options
+
+        if ordered:
+            if self.selected_graph_device not in ordered:
+                self.selected_graph_device = ordered[0]
+                self.metric_history = []
+                self._last_history_key = None
+            self.device_selector.selected = self.selected_graph_device
+        else:
+            self.selected_graph_device = None
+            self.device_selector.selected = "No devices"
+            self.metric_history = []
+            self._last_history_key = None
+
+    def _get_selected_graph_metrics(self):
+        if not self.selected_graph_device:
+            return None
+
+        device_data = self.cache_data.get(self.selected_graph_device, {})
+        if not isinstance(device_data, dict):
+            return None
+
+        metrics = device_data.get("metrics", {})
+        if not isinstance(metrics, dict):
+            return None
+        return metrics
+
     def _record_metric_history(self, averages):
+        _ = averages
         history_key = self._get_history_key()
         if not history_key or history_key == self._last_history_key:
             return
 
-        latest_timestamp = max(
-            (
-                device_data.get("timestamp")
-                for device_data in self.cache_data.values()
-                if device_data.get("timestamp")
-            ),
-            default=None,
-        )
+        if not self.selected_graph_device:
+            return
+
+        device_data = self.cache_data.get(self.selected_graph_device, {})
+        if not isinstance(device_data, dict):
+            return
+
+        selected_metrics = device_data.get("metrics", {})
+        if not isinstance(selected_metrics, dict) or not selected_metrics:
+            return
+
+        latest_timestamp = device_data.get("timestamp")
 
         history_entry = {
             "timestamp": latest_timestamp,
             "metrics": {
-                metric_key: averages.get(metric_key)
+                metric_key: selected_metrics.get(metric_key)
                 for metric_key in self.GRAPH_METRICS
             },
         }
@@ -255,6 +307,20 @@ class SystemDashboardScreen(BaseScreen):
             else:
                 pos = event.pos
 
+            selected = self.device_selector.handle_event(event)
+            if selected in self.device_selector.options and selected != "No devices":
+                if selected != self.selected_graph_device:
+                    self.selected_graph_device = selected
+                    self.metric_history = []
+                    self._last_history_key = None
+
+            selector_hit = self.device_selector.rect.collidepoint(pos)
+            expanded_hit = False
+            if self.device_selector.expanded:
+                expanded_hit = self.device_selector._expanded_rect().collidepoint(pos)
+            if selector_hit or expanded_hit:
+                return
+
             # Power Button clicked
             if self.power_button.is_clicked(pos):
                 self.app.ui_control.stop_system()
@@ -269,6 +335,7 @@ class SystemDashboardScreen(BaseScreen):
 
     def update(self):
         self._load_cache_data()
+        self._refresh_graph_device_selector()
         averages = self._calculate_aggregated_metrics()
         if averages:
             self._record_metric_history(averages)
@@ -343,9 +410,10 @@ class SystemDashboardScreen(BaseScreen):
             table_rect = pygame.Rect(status_x, panel_top, table_width, panel_height)
             graph_rect = pygame.Rect(table_rect.right + gap, panel_top, graph_width, panel_height)
 
-            graph_metrics = self._get_active_graph_metrics(averages)
+            selected_metrics = self._get_selected_graph_metrics() or {}
+            graph_metrics = self._get_active_graph_metrics(selected_metrics)
             self._draw_metrics_table(surface, table_rect, averages, graph_metrics)
-            self._draw_metrics_graph(surface, graph_rect, averages, graph_metrics)
+            self._draw_metrics_graph(surface, graph_rect, selected_metrics, graph_metrics)
         else:
             no_data_font = theme.FONT_MEDIUM
             no_data_text = no_data_font.render("No device data available", True, theme.LIGHT_GRAY)
@@ -447,7 +515,7 @@ class SystemDashboardScreen(BaseScreen):
 
         self._draw_averages_color_key(surface, legend_rect, graph_metrics)
 
-    def _draw_metrics_graph(self, surface, rect, averages, graph_metrics):
+    def _draw_metrics_graph(self, surface, rect, selected_metrics, graph_metrics):
         """Draw a right-side live line graph for averaged metrics."""
         pygame.draw.rect(surface, theme.CARD_BG, rect, border_radius=theme.CARD_CORNER_RADIUS)
         pygame.draw.rect(surface, theme.BLUE, rect, theme.CARD_BORDER_WIDTH, border_radius=theme.CARD_CORNER_RADIUS)
@@ -469,6 +537,20 @@ class SystemDashboardScreen(BaseScreen):
         self.network_toggle_button.text = "Hide Net" if self.show_network_lines else "Show Net"
         self.network_toggle_button.bg_color = theme.BLUE if self.show_network_lines else (55, 55, 55)
         self.network_toggle_button.draw(surface)
+
+        device_label = theme.FONT_SMALL.render("Device", True, theme.LIGHTER_GRAY)
+        surface.blit(device_label, (rect.x + theme.CARD_PADDING, rect.y + 40))
+        self.device_selector.rect = pygame.Rect(rect.x + theme.CARD_PADDING, rect.y + 56, 176, 30)
+        self.device_selector.draw(surface)
+
+        if self.device_selector.expanded:
+            self.device_selector.draw_expanded(surface)
+
+        if not self.selected_graph_device:
+            no_selection_text = theme.FONT_MEDIUM.render("No device selected", True, theme.LIGHT_GRAY)
+            no_selection_rect = no_selection_text.get_rect(center=rect.center)
+            surface.blit(no_selection_text, no_selection_rect)
+            return
 
         if not graph_metrics or len(self.metric_history) < 2:
             no_data_text = theme.FONT_MEDIUM.render("Waiting for more data...", True, theme.LIGHT_GRAY)
@@ -543,10 +625,7 @@ class SystemDashboardScreen(BaseScreen):
                     continue
 
                 normalized = self._normalize_metric_value(metric_key, value)
-                if sample_count == 1:
-                    x = plot_rect.centerx
-                else:
-                    x = plot_rect.x + int((plot_rect.width * index) / max(sample_count - 1, 1))
+                x = plot_rect.x + int((plot_rect.width * index) / max(sample_count - 1, 1))
 
                 y_span = max(1, plot_rect.height - (marker_radius * 2))
                 y = plot_rect.bottom - marker_radius - int(normalized * y_span)
@@ -565,7 +644,7 @@ class SystemDashboardScreen(BaseScreen):
         surface.set_clip(old_clip)
 
         if not self.show_network_lines:
-            self._draw_network_summary(surface, rect, averages)
+            self._draw_network_summary(surface, rect, selected_metrics)
 
     def _format_metric_value(self, metric_key, value):
         if metric_key in {"net_rx_kbps", "net_tx_kbps"}:

@@ -142,7 +142,7 @@ class SystemDashboardScreen(BaseScreen):
 
     def _load_cache_data(self):
         """Load cache data from cache_data.json"""
-        cache_filepath = "data/cache_data.json"
+        cache_filepath = getattr(self.app.config, "cache_file", "data/cache_data.json")
         if os.path.exists(cache_filepath):
             try:
                 with open(cache_filepath, 'r') as f:

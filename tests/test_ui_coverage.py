@@ -281,8 +281,8 @@ def test_add_wifi_email_extended_branches(monkeypatch, rich_ui_app, ui_surface):
 def test_main_screen_behavior_and_helpers(monkeypatch, tmp_path, rich_ui_app, ui_surface):
     _patch_assets(monkeypatch)
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-    cache_path = tmp_path / "data" / "cache_data.json"
+    cache_path = tmp_path / "cache_data.json"
+    rich_ui_app.config.cache_file = str(cache_path)
     cache_payload = {
         "alpha": {
             "timestamp": "2026-04-08T12:34:56.789",
@@ -559,8 +559,9 @@ def test_settings_screen_behavior_and_rendering(monkeypatch, rich_ui_app, ui_sur
 def test_system_dashboard_screen_behavior(monkeypatch, tmp_path, rich_ui_app, ui_surface):
     _patch_assets(monkeypatch)
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-    (tmp_path / "data" / "cache_data.json").write_text(
+    cache_path = tmp_path / "cache_data.json"
+    rich_ui_app.config.cache_file = str(cache_path)
+    cache_path.write_text(
         json.dumps(
             {
                 "alpha": {

@@ -337,8 +337,9 @@ def test_main_and_settings_remaining_paths(monkeypatch, tmp_path, fake_bus, temp
     app = _app(fake_bus, temp_config)
 
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-    (tmp_path / "data" / "cache_data.json").write_text(
+    cache_path = tmp_path / "cache_data.json"
+    app.config.cache_file = str(cache_path)
+    cache_path.write_text(
         json.dumps({"alpha": {"timestamp": "2026-04-08T10:00:00.000", "metrics": {"uptime_seconds": 200000}, "severities": {}}}),
         encoding="utf-8",
     )
@@ -430,8 +431,9 @@ def test_dashboard_remaining_paths(monkeypatch, tmp_path, fake_bus, temp_config,
     app = _app(fake_bus, temp_config)
 
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-    (tmp_path / "data" / "cache_data.json").write_text("{}", encoding="utf-8")
+    cache_path = tmp_path / "cache_data.json"
+    app.config.cache_file = str(cache_path)
+    cache_path.write_text("{}", encoding="utf-8")
 
     # Cover fallback icon load path in __init__.
     monkeypatch.setattr(BaseScreen, "load_assets", lambda self: setattr(self, "assets", {}))
@@ -443,7 +445,7 @@ def test_dashboard_remaining_paths(monkeypatch, tmp_path, fake_bus, temp_config,
     monkeypatch.setattr("ui.screens.SystemDashboardScreen.pygame.image.load", lambda _p: _Loaded())
     monkeypatch.setattr(
         "ui.screens.SystemDashboardScreen.os.path.exists",
-        lambda p: p.endswith("power_button.png") or p.endswith("cache_data.json"),
+        lambda p: p.endswith("power_button.png") or p == app.config.cache_file,
     )
 
     s = SystemDashboardScreen(app)
@@ -577,8 +579,9 @@ def test_main_screen_drag_guard_and_sidebar_draw_lines(monkeypatch, tmp_path, fa
     app = _app(fake_bus, temp_config)
 
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "data").mkdir()
-    (tmp_path / "data" / "cache_data.json").write_text("{}", encoding="utf-8")
+    cache_path = tmp_path / "cache_data.json"
+    app.config.cache_file = str(cache_path)
+    cache_path.write_text("{}", encoding="utf-8")
 
     main = MainScreen(app)
     main.selected_device = app.devices[0]

@@ -406,3 +406,24 @@ def test_run_node_stop_during_wait_and_time_drift(monkeypatch):
     times = iter([0, 0, 5, 5, 5, 5, 5, 5])
     monkeypatch.setattr(pa.time, "monotonic", lambda: next(times))
     run_node(node2, Q())
+
+
+def test_persistent_connection_open_password_branch(monkeypatch):
+    created = {}
+
+    class FakeFabric:
+        def __init__(self, **kwargs):
+            created.update(kwargs)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(pa, "Connection", lambda **kwargs: FakeFabric(**kwargs))
+
+    conn = PersistentConnection("host", "user", "key.pem", password="secret")
+    conn.open()
+
+    assert conn.conn is not None
+    assert created["host"] == "host"
+    assert created["user"] == "user"
+

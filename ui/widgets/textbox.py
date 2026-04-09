@@ -50,7 +50,7 @@ class Textbox:
 
         pygame.draw.rect(surface, self.color, self.rect,self.border_radius)
 
-        if self.active or self.txt is not "":
+        if self.active or self.txt != "":
             display_text = self.txt
             text_color = (255, 255, 255)
         else:

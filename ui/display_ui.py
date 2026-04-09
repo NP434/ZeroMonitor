@@ -118,6 +118,7 @@ class DisplayUI:
 
     def shutdown(self):
         """UI-initiated shutdown -> publish STOP_SYSTEM"""
+        self._running = False
         self.bus.publish("STOP_SYSTEM", None)
 
     def _handle_stop_system(self, payload=None):
@@ -298,5 +299,5 @@ class DisplayUI:
         sys.exit()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     DisplayUI().run()

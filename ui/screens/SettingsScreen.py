@@ -242,11 +242,8 @@ class SettingsScreen(BaseScreen):
         #   row_y += ROW_STRIDE
 
     def _polling_label(self, seconds):
-        if seconds >= 25:
-            return "Low"
-        elif seconds >= 10:
-            return "Medium"
-        return "High"
+        reverse_map = {v: k for k, v in self.POLLING_MAP.items()}
+        return reverse_map.get(int(seconds), "Custom")
 
     def _apply_device(self):
         if not self.unsaved_changes or not self.selected_device:
@@ -304,9 +301,14 @@ class SettingsScreen(BaseScreen):
         device["name"] = new_name
 
         if old_name in self.device_buttons:
-            btn = self.device_buttons.pop(old_name)
-            btn.text = new_name
-            self.device_buttons[new_name] = btn
+            reordered = {}
+            for name, btn in self.device_buttons.items():
+                if name == old_name:
+                    btn.text = new_name
+                    reordered[new_name] = btn
+                else:
+                    reordered[name] = btn
+            self.device_buttons = reordered
 
         self.selected_device = new_name
         self.original_name = new_name

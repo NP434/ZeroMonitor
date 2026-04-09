@@ -197,10 +197,11 @@ class Driver:
 
     def add_node(self, node_config: dict):
         """Add a node dynamically by updating device_list.json"""
+        node_name = node_config.get("name")
 
         logging.info(
             "[Driver] Adding node: %s",
-            node_config.get("name")
+            node_name
         )
 
         with open(self.config.decrypted_list, "r") as f:
@@ -208,11 +209,16 @@ class Driver:
 
         # Prevent duplicates by name
         for item in data.values():
-            if item.get("name") == node_config.get("name"):
+            if item.get("name") == node_name:
                 logging.warning(
                     "Node '%s' already exists — skipping",
-                    node_config.get("name")
+                    node_name
                 )
+                self.event_bus.publish("ACK_ADD_NODE", {
+                    "name": node_name,
+                    "success": False,
+                    "reason": "duplicate",
+                })
                 return
 
         # Create a new uuid string for the node
@@ -227,12 +233,16 @@ class Driver:
 
         logging.info(
             "[Driver] Node '%s' added — triggering reload",
-            node_config.get("name")
+            node_name
         )
 
         # optional immediate reconcile
         self.reload_config()
         self.event_bus.publish("SYNC_VAULT", {})
+        self.event_bus.publish("ACK_ADD_NODE", {
+            "name": node_name,
+            "success": True,
+        })
 
     # This function allows the UI to subscribe to metric events
     def _dispatch_metrics(self):

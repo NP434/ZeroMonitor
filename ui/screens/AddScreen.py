@@ -77,9 +77,32 @@ class AddScreen(BaseScreen):
         self.is_pairing = False
         self.pending_device_name = None
         self._loading_dots = 0
+        self.add_feedback_message = None
+        self.add_feedback_color = theme.YELLOW
 
         # Clear password-auth loading once the new node appears in the shared device list.
         self.app.bus.subscribe("DEVICE_LIST_UPDATED", self._on_device_list_updated)
+        self.app.bus.subscribe("ACK_ADD_NODE", self._on_add_node_ack)
+
+    def _on_add_node_ack(self, payload):
+        if not self.is_pairing or not self.pending_device_name:
+            return
+
+        if not isinstance(payload, dict):
+            return
+
+        if payload.get("name") == self.pending_device_name:
+            self.is_pairing = False
+            self.pending_device_name = None
+            if payload.get("success"):
+                self.add_feedback_message = "Device added successfully"
+                self.add_feedback_color = theme.GREEN
+            elif payload.get("reason") == "duplicate":
+                self.add_feedback_message = "Add skipped: device name already exists"
+                self.add_feedback_color = theme.YELLOW
+            else:
+                self.add_feedback_message = "Failed to add device"
+                self.add_feedback_color = theme.RED
 
     def _on_device_list_updated(self, devices):
         if not self.is_pairing or not self.pending_device_name:
@@ -138,9 +161,11 @@ class AddScreen(BaseScreen):
                 self.HostNameBox.txt = ""
                 self.UserNameBox.txt = ""
                 self.Password_button.txt = ""
-        
+                self.add_feedback_message = None
+
                 self.app.change_screen("main")
             if self.done_button.is_clicked(pos):
+                self.add_feedback_message = None
                 node_config = {
                 "name":self.DeviceNameBox.txt ,
                 "hostname": self.HostNameBox.txt,
@@ -244,6 +269,11 @@ class AddScreen(BaseScreen):
         #Draw Pairing Token Popup
         if self.token_to_be_disp and self.popup:
             self.popup.draw(screen)
+
+        if self.add_feedback_message and not self.is_pairing:
+            feedback = theme.FONT_SMALL.render(self.add_feedback_message, True, self.add_feedback_color)
+            feedback_rect = feedback.get_rect(center=(self.app.width // 2, self.app.height - 26))
+            screen.blit(feedback, feedback_rect)
 
         if self.is_pairing:
             self._loading_dots = (self._loading_dots + 1) % 60

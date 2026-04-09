@@ -70,3 +70,4 @@ ZeroMonitor follows a **client-server model**:
 ---
 
 ![Coverage](https://codecov.io/gh/YOUR_USERNAME/YOUR_REPO/branch/main/graph/badge.svg)
+[![Run Pytest](https://github.com/NP434/ZeroMonitor/actions/workflows/tests.yml/badge.svg)](https://github.com/NP434/ZeroMonitor/actions/workflows/tests.yml)

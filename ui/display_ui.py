@@ -93,16 +93,17 @@ class DisplayUI:
                 self.devices = list(device_data.values())
 
         # Register screens
+        init_screen = InitScreen(self)
         self.screens = {
             "dashboard": SystemDashboardScreen(self),
             "main": MainScreen(self),
             "settings": SettingsScreen (self),
             "add_device": AddScreen(self),
             "settings" : SettingsScreen(self),
-            "init": InitScreen(self),
+            "init": init_screen,
 
             # Boot Screens
-            "init_passcode": InitScreen(self),
+            "init_passcode": init_screen,
             "wifi_setup": WiFiScreen(self),
             "email_setup": EmailScreen(self)
         }
@@ -224,6 +225,18 @@ class DisplayUI:
     def _handle_device_list_update(self, devices):
         print("inside _handle_device_list_update")
         self.devices = list(devices.values())
+
+        # Always refresh the main screen model even when it is not active.
+        main_screen = self.screens.get("main")
+        if main_screen and hasattr(main_screen, "_build_device_buttons"):
+            main_screen._build_device_buttons()
+
+        # Keep settings sidebar in sync if settings is active.
+        if isinstance(self.current_screen, SettingsScreen):
+            if hasattr(self.current_screen, "_build_device_list"):
+                self.current_screen._build_device_list()
+
+        # If currently on main, ensure immediate redraw uses refreshed buttons.
         if isinstance(self.current_screen, MainScreen):
             self.current_screen._build_device_buttons()
     

@@ -37,7 +37,7 @@ class ControlUI:
     def add_node(self,node_config:dict):
         """Function to add a new target node to be polled, no input for now, just hard coded"""
         self.bus.publish(
-            "ADD_NODE", node_config
+            "UI_ADD_NODE", node_config
         )
 
     def remove_node(self, device_name):

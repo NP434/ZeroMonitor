@@ -74,6 +74,27 @@ class AddScreen(BaseScreen):
         self.popup = None
         self.token_to_be_disp = False
         self.token = None
+        self.is_pairing = False
+        self.pending_device_name = None
+        self._loading_dots = 0
+
+        # Clear password-auth loading once the new node appears in the shared device list.
+        self.app.bus.subscribe("DEVICE_LIST_UPDATED", self._on_device_list_updated)
+
+    def _on_device_list_updated(self, devices):
+        if not self.is_pairing or not self.pending_device_name:
+            return
+
+        if not isinstance(devices, dict):
+            return
+
+        found = any(
+            isinstance(item, dict) and item.get("name") == self.pending_device_name
+            for item in devices.values()
+        )
+        if found:
+            self.is_pairing = False
+            self.pending_device_name = None
 
     def end_token_disp(self):
         self.token_to_be_disp = False
@@ -95,6 +116,9 @@ class AddScreen(BaseScreen):
             self.active_textbox.txt += key
     
     def handle_event(self,event):
+        if self.is_pairing:
+            return
+
         self._events.append(event)
 
         if event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
@@ -129,6 +153,9 @@ class AddScreen(BaseScreen):
                 if self.mode == "Pass_auth":
                     node_config["Pword"] = self.passwordBox.txt
                 self.app.ui_control.add_node(node_config)
+                if self.mode == "Pass_auth":
+                    self.is_pairing = True
+                    self.pending_device_name = node_config.get("name")
             if self.Endpoint_button.is_clicked(pos):
                 self.mode = "Endpoint"
                 self.Password_button.bg_color = theme.GRAY
@@ -217,3 +244,17 @@ class AddScreen(BaseScreen):
         #Draw Pairing Token Popup
         if self.token_to_be_disp and self.popup:
             self.popup.draw(screen)
+
+        if self.is_pairing:
+            self._loading_dots = (self._loading_dots + 1) % 60
+            dot_count = (self._loading_dots // 20) + 1
+            loading_text = theme.FONT_MEDIUM.render(
+                f"Adding device via password auth{'.' * dot_count}",
+                True,
+                theme.YELLOW,
+            )
+            overlay = pygame.Surface((self.app.width, self.app.height), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 140))
+            screen.blit(overlay, (0, 0))
+            text_rect = loading_text.get_rect(center=(self.app.width // 2, self.app.height // 2))
+            screen.blit(loading_text, text_rect)

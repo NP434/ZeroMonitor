@@ -63,7 +63,7 @@ class Driver:
         )
 
         self.event_bus.subscribe(
-            "ADD_NODE",
+            "PAIRING_NODE_READY",
             self.add_node
         )
 
@@ -232,7 +232,8 @@ class Driver:
 
         # optional immediate reconcile
         self.reload_config()
-    
+        self.event_bus.publish("SYNC_VAULT", {})
+
     # This function allows the UI to subscribe to metric events
     def _dispatch_metrics(self):
         """Background function to push metrics to the event bus"""

@@ -34,7 +34,7 @@ class ControlPairing:
         self.bus = bus
         self.config = config
         #self.logger = logging.getlogger("pairing")
-        self.bus.subscribe("ADD_NODE", self.add_node)
+        self.bus.subscribe("UI_ADD_NODE", self.add_node)
 
     def get_ip(self):
         """retreives the IP address of host and adds it to curl command"""
@@ -92,7 +92,6 @@ class ControlPairing:
 
         #Following sets path files for neccessary components
         key_path = self.config.ssh_pub_key
-        list_path = self.config.decrypted_list
         pairing_path = self.config.pairing_info
         serv_cert_path = str(Path(self.config.server_cert).resolve())
         serv_key_path = str(Path(self.config.server_key).resolve())
@@ -151,8 +150,6 @@ class ControlPairing:
 
 
             node_config["operating_system"] = os_info
-            with open("device_list.json", "w") as f:
-                json.dump(node_config,f, indent=4)
 
 
         elif node_config["pairing_mode"] == "Pass_auth":
@@ -160,8 +157,8 @@ class ControlPairing:
             print("Using password based authentication")
             os_info = self.detect_os(hn,un,password=pw)          
             node_config["operating_system"] = os_info
-            with open("device_list.json", "w") as f:
-                json.dump(node_config,f, indent=4)
-                print("Saving node data to node config")
-        print("Publishing vault event")
-        self.bus.publish("SYNC_VAULT", {})
+        else:
+            node_config["operating_system"] = "OS_Unknown"
+
+        print("Publishing pairing-ready node")
+        self.bus.publish("PAIRING_NODE_READY", node_config)

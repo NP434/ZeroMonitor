@@ -232,6 +232,15 @@ def test_add_wifi_email_extended_branches(monkeypatch, rich_ui_app, ui_surface):
 
     add.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=add.Endpoint_button.rect.center))
     add.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=add.Password_button.rect.center))
+    add.DeviceNameBox.txt = "new-pass-node"
+    add.HostNameBox.txt = "10.0.0.2"
+    add.UserNameBox.txt = "pi"
+    add.passwordBox.txt = "secret"
+    add.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=add.done_button.rect.center))
+    assert add.is_pairing is True
+    add.draw(ui_surface)
+    add._on_device_list_updated({"id-1": {"name": "new-pass-node"}})
+    assert add.is_pairing is False
     add.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=add.passwordBox.rect.center))
     add._on_key_pressed("s")
     add._on_key_pressed("Back")

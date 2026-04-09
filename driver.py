@@ -3,6 +3,9 @@ import uuid
 from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 from json import load
+
+from click import password_option
+
 from polling_agent import (
     PollingAgent, 
     Node, 
@@ -337,11 +340,13 @@ def load_targets(config) -> list:
         name = item.get("name")
         os_type = (item.get("operating_system") or "").lower()
         poll_freq = int(item.get("polling_frequency", 5))
+        password = item.get("Pword")  # Add this line
 
         conn = PersistentConnection(
             host=host, 
             user=user,
-            key_path=config.ssh_key_ram # Feeds private key
+            key_path=config.ssh_key_ram, # Feeds private key
+            password=password # Feeds password (if applicable)
         )
         
         if(os_type == "linux"):

@@ -280,16 +280,19 @@ Write-Output \"NET_TX_BPS=$($tx.Sum)\"
 # This class maintains a persistent ssh session with targets to reduce polling overhead 
 class PersistentConnection:
     """Persistent connection to reduce SSH overhead"""
-    def __init__(self, host: str, user: str, key_path: str, connect_timeout=5, max_retries=5):
+    def __init__(self, host: str, user: str, key_path: str, password: str = None, connect_timeout=5, max_retries=5):
         self.host = host
         self.user = user
-        #Add encrypted key access
+        # Add encrypted key access
         self.key_path = key_path
+        # Password Authentication
+        self.password=password
         self.connect_timeout = connect_timeout
         self.max_retries = max_retries
         self.conn: Optional[Connection] = None
         # Semaphore for thread safety
-        self.lock = threading.Lock() 
+        self.lock = threading.Lock()
+
 
     def open(self):
         """Open connection if not already open"""
@@ -297,6 +300,15 @@ class PersistentConnection:
         with self.lock:
             # Create conneciton if it doesnt exist
             if self.conn is None:
+                connect_kwargs = {
+                    "look_for_keys": False,
+                    "allow_agent": False
+                }
+                if self.password:
+                    connect_kwargs["password"] = self.password
+                elif self.key_path:
+                    connect_kwargs["key_filename"] = self.key_path
+
                 self.conn = Connection(
                     host=self.host,
                     user=self.user,

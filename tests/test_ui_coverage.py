@@ -24,7 +24,7 @@ from ui.widgets.SettingsPopup import SettingsPopup
 from ui.widgets.SidebarPanel import SidebarPanel
 from ui.widgets.Slider import Slider
 from ui.widgets.ToggleSwitch import ToggleSwitch
-from ui.widgets.textbox import Textbox
+from ui.widgets.Textbox import Textbox
 
 
 def _surface(size=(40, 40)):

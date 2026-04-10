@@ -24,6 +24,7 @@ from event_bus import EventBus
 from driver import Driver
 from security_manager import SecurityManager
 from network_manager import NetworkManager
+from update_manager import UpdateManager
 from datainterpreter import DataInterpreter
 from ui.display_ui import DisplayUI
 from ui.control_ui import ControlUI
@@ -58,6 +59,7 @@ ui_control = ControlUI(bus, config=config)
 pair_control = ControlPairing(bus, config=config)
 security = SecurityManager(event_bus=bus, config=config)
 network = NetworkManager(bus=bus, config=config)
+updater = UpdateManager(event_bus=bus, config=config)
 
 # Create the Pygame UI (subscribes to backend events and renders screens)
 ui_display = DisplayUI(config=config, bus=bus, ui_control=ui_control)

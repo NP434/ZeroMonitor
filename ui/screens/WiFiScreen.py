@@ -85,8 +85,8 @@ class WiFiScreen:
         self.is_connecting = False # Stop the 'loading' state
         
         if success:
-            self.logger.info("WiFi Connection Successful. Routing to Passcode Setup.")
-            self.app.change_screen("init_passcode")
+            self.logger.info("WiFi Connection Successful. Routing to Update Screen.")
+            self.app.change_screen("updater")
         else:
             self.logger.error(f"WiFi Connection Failed: {error_msg}")
             self.error_message = error_msg

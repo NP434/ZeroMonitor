@@ -18,6 +18,7 @@ from ui.screens.AddScreen import AddScreen
 from ui.screens.WiFiScreen import WiFiScreen
 from ui.screens.InitScreen import InitScreen
 from ui.screens.EmailScreen import EmailScreen
+from ui.screens.UpdateScreen import UpdateScreen
 
 # initialize pygame
 pygame.init()
@@ -90,29 +91,34 @@ class DisplayUI:
         self.temp_unit = "C"
 
         # Register screens
-        init_screen = InitScreen(self)
         self.screens = {
             "dashboard": SystemDashboardScreen(self),
             "main": MainScreen(self),
             "settings": SettingsScreen (self),
             "add_device": AddScreen(self),
-            "settings" : SettingsScreen(self),
-            "init": init_screen,
 
             # Boot Screens
-            "init_passcode": init_screen,
+            "init_passcode": InitScreen(self),
             "wifi_setup": WiFiScreen(self),
-            "email_setup": EmailScreen(self)
+            "email_setup": EmailScreen(self),
+            "updater": UpdateScreen(self)
         }
 
         # Logic for starting screen, DO NOT CHANGE
         start_key = self._boot_router()
         self.current_screen = self.screens[start_key]
+        # Need logic for Updater
+        if hasattr(self.current_screen, 'on_enter'):
+            self.current_screen.on_enter()
         self._running = False
 
 
     def change_screen(self, name):
         self.current_screen = self.screens[name]
+        
+        # If the new screen has an 'on_enter' setup method, run it
+        if hasattr(self.current_screen, 'on_enter'):
+            self.current_screen.on_enter()
 
     def shutdown(self):
         """UI-initiated shutdown -> publish STOP_SYSTEM"""
@@ -244,28 +250,24 @@ class DisplayUI:
 
 
     def _boot_router(self):
-        """Evaluates the system state to determine the first screen to show."""
+        """Evaluates the system state to determine the first screen to show"""
         print("[UI] Evaluating boot state artifacts...")
         
-        # 1. Check if the device has an encrypted vault (SSH Key)
+        # Check if the device has an encrypted vault (SSH Key)
         is_first_boot = not os.path.exists(self.config.ssh_key_enc)
         
-        # ==========================================
         # STANDARD BOOT (Vault Exists)
-        # ==========================================
         if not is_first_boot:
             # Standard Boot: Always authenticate first!
-            print("[UI] Vault found. Standard Boot. Routing to Unlock Screen.")
-            return "init_passcode"
+            print("[UI] Vault found. Standard Boot. Routing to Update Screen")
+            return "updater"
 
-        # ==========================================
         # FIRST BOOT (No Vault Exists)
-        # ==========================================
         print("[UI] First Boot detected. Checking network...")
         
-        # Step 1: Check Wi-Fi
+        # Check Wi-Fi
         if self.config.dev_mode:
-            print("[UI] DEV MODE: Faking network disconnect to test WiFi UI.")
+            print("[UI] DEV MODE: Faking network disconnect to test WiFi UI")
             return "wifi_setup"
         else:
             try:
@@ -277,15 +279,15 @@ class DisplayUI:
                     text=True
                 )
                 if "100 (connected)" not in result.stdout:
-                    print("[UI] Boot Router: No local network. Routing to WiFi Setup.")
+                    print("[UI] Boot Router: No local network. Routing to WiFi Setup")
                     return "wifi_setup"
             except Exception as e:
-                print(f"[UI] Boot Router: Interface check failed ({e}). Routing to WiFi Setup.")
+                print(f"[UI] Boot Router: Interface check failed ({e}). Routing to WiFi Setup")
                 return "wifi_setup"
 
-        # Step 2: If Wi-Fi is connected, go straight to Passcode creation
-        print("[UI] Network connected. Routing to Passcode Setup.")
-        return "init_passcode"
+        # If Wi-Fi is connected, go straight to Passcode creation
+        print("[UI] Network connected. Routing to Update Screen")
+        return "updater"
 
 
     def run(self):

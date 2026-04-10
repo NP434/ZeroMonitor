@@ -25,7 +25,7 @@ from ui.widgets.SidebarPanel import SidebarPanel
 from ui.widgets.Slider import Slider
 from ui.widgets.ToggleSwitch import ToggleSwitch
 from ui.widgets.Textbox import Textbox
-
+import ui.utilities as utilities
 
 def _surface(size=(40, 40)):
     return pygame.Surface(size, pygame.SRCALPHA)
@@ -318,14 +318,14 @@ def test_main_screen_behavior_and_helpers(monkeypatch, tmp_path, rich_ui_app, ui
     assert screen._event_pos(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a)) is None
     assert screen._format_timestamp("2026-04-08T12:34:56.789") == "2026-04-08 12:34:56"
     assert screen._format_timestamp(123) == "123"
-    assert screen._format_metric_value("missing", None) == "N/A"
-    assert screen._format_metric_value("uptime_seconds", 125) == "0h 2m"
-    assert screen._format_metric_value("net_rx_kbps", 2000) == "2.00 Mbps"
-    assert screen._format_metric_value("net_tx_kbps", 300) == "300 kbps"
-    assert screen._format_metric_value("mem_used_mb", 512.9) == "512 MB"
-    assert screen._format_metric_value("cpu_load_1m", 0.1234) == "0.12"
-    assert screen._format_metric_value("cpu_temp_c", 51.2) == "51.20 C"
-    assert screen._format_metric_value("extra", 7) == "7"
+    assert screen._value("missing", None) == "N/A"
+    assert screen._value("uptime_seconds", 125) == "0h 2m"
+    assert utilities._format_metric_value("net_rx_kbps", 2000) == "2.00 Mbps"
+    assert utilities._format_metric_value("net_tx_kbps", 300) == "300 kbps"
+    assert utilities._format_metric_value("mem_used_mb", 512.9) == "512 MB"
+    assert utilities._format_metric_value("cpu_load_1m", 0.1234) == "0.12"
+    assert utilities._format_metric_value("cpu_temp_c", 51.2) == "51.20 C"
+    assert utilities._format_metric_value("extra", 7) == "7"
 
     screen.draw(ui_surface)
     screen.selected_device = rich_ui_app.devices[0]
@@ -615,9 +615,9 @@ def test_system_dashboard_screen_behavior(monkeypatch, tmp_path, rich_ui_app, ui
     screen.handle_event(pygame.event.Event(pygame.FINGERDOWN, x=screen.network_toggle_button.rect.centerx / rich_ui_app.width, y=screen.network_toggle_button.rect.centery / rich_ui_app.height))
     screen.update()
 
-    assert screen._format_metric_value("net_rx_kbps", 1500) == "1.50 Mbps"
-    assert screen._format_metric_value("cpu_load_1m", 0.25) == "0.25"
-    assert screen._format_metric_value("cpu_temp_c", 42.5) == "42.5°C"
+    assert utilities._format_metric_value("net_rx_kbps", 1500) == "1.50 Mbps"
+    assert utilities._format_metric_value("cpu_load_1m", 0.25) == "0.25"
+    assert utilities._format_metric_value("cpu_temp_c", 42.5) == "42.5°C"
     assert screen._normalize_metric_value("cpu_temp_c", 50) == 0.5
     assert screen._normalize_metric_value("custom", -10) == 0.0
     assert screen._format_history_label(None) == ""

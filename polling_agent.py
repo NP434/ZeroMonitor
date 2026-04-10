@@ -313,11 +313,7 @@ class PersistentConnection:
                     host=self.host,
                     user=self.user,
                     connect_timeout=self.connect_timeout,
-                    connect_kwargs={ # Use our private key only
-                        "key_filename": self.key_path, 
-                        "look_for_keys": False,
-                        "allow_agent": False
-                    }
+                    connect_kwargs=connect_kwargs
                 )
 
     def run(self, cmd, node_name=None, stop_event=None, **kwargs):

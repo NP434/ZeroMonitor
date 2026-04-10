@@ -6,3 +6,4 @@ pytest
 pytest-cov
 cryptography
 requests
+argon2-cffi

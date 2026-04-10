@@ -2,10 +2,9 @@ import os
 import json
 import logging
 import base64
+import argon2
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes
 from cryptography.fernet import Fernet
 
 class SecurityManager:
@@ -60,14 +59,17 @@ class SecurityManager:
 
         # --- Encrypt the Device List ---
         salt = os.urandom(16)
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
+        raw_key = argon2.low_level.hash_secret_raw(
+            secret=passcode_bytes,
             salt=salt,
-            iterations=480000,
+            time_cost=20,          # CPU Iterations
+            memory_cost=65536,    # 64 MB of RAM
+            parallelism=4,        # Use all 4 Cortex-A53 cores
+            hash_len=32,          # Fernet requires exactly 32 bytes
+            type=argon2.low_level.Type.ID 
         )
-        encryption_key = base64.urlsafe_b64encode(kdf.derive(passcode_bytes))
-        
+        encryption_key = base64.urlsafe_b64encode(raw_key)
+
         fernet = Fernet(encryption_key)
         encrypted_data = fernet.encrypt(device_json)
         
@@ -97,15 +99,18 @@ class SecurityManager:
             salt = file_data[:16]
             encrypted_data = file_data[16:]
 
-            # Rebuild the key
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                length=32,
+            # Rebuild the key using Argon2
+            raw_key = argon2.low_level.hash_secret_raw(
+                secret=passcode_bytes,
                 salt=salt,
-                iterations=480000,
+                time_cost=20,          
+                memory_cost=65536,    
+                parallelism=4,        
+                hash_len=32,          
+                type=argon2.low_level.Type.ID 
             )
-            encryption_key = base64.urlsafe_b64encode(kdf.derive(passcode_bytes))
-
+            encryption_key = base64.urlsafe_b64encode(raw_key)
+            
             # Save key for JSON Encryption
             self._session_key = encryption_key
             self._session_salt = salt

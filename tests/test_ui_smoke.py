@@ -130,14 +130,14 @@ def test_control_ui_smoke(fake_bus, temp_config, monkeypatch, tmp_path):
     ui.stop_system()
     ui.preview_brightness(20)
     ui.set_brightness(30)
-    assert ui.simulated_brightness == 30
+    assert ui.simulate_brightness == 30
 
     backlight_dir = tmp_path / "backlight"
     backlight_dir.mkdir()
     (backlight_dir / "max_brightness").write_text("100", encoding="utf-8")
     ui.on_pi = True
     ui.backlight_path = str(backlight_dir)
-    ui.set_brightness(40)
+    ui._write_brightness(40)
     assert (backlight_dir / "brightness").read_text(encoding="utf-8") == "40"
 
 
@@ -185,7 +185,7 @@ def test_init_wifi_email_add_screens_smoke(monkeypatch, ui_app, ui_surface):
     wifi.draw(ui_surface)
     assert wifi.error_message == "bad wifi"
     wifi._handle_wifi_result({"success": True})
-    assert "init_passcode" in ui_app.changed_screens
+    assert "updater" in ui_app.changed_screens
 
     email = EmailScreen(ui_app)
     email.on_key_press("a")
@@ -219,17 +219,17 @@ def test_display_ui_boot_router_and_dummy_screen(monkeypatch, ui_surface, temp_c
     temp_config.ssh_key_enc = "/tmp/missing-key-file"
     assert ui._boot_router() == "wifi_setup"
 
-    # standard boot -> init_passcode
+    # standard boot -> updater
     key_path = os.path.join(temp_config.storage_dir, "id_ed25519.enc")
     open(key_path, "wb").close()
     temp_config.ssh_key_enc = key_path
-    assert ui._boot_router() == "init_passcode"
+    assert ui._boot_router() == "updater"
 
-    # first boot, prod mode, connected network -> init_passcode
+    # first boot, prod mode, connected network -> updater
     os.remove(key_path)
     temp_config.dev_mode = False
     monkeypatch.setattr(display_ui.subprocess, "run", lambda *a, **k: SimpleNamespace(stdout="100 (connected)"))
-    assert ui._boot_router() == "init_passcode"
+    assert ui._boot_router() == "updater"
 
     # first boot, prod mode, nmcli exception -> wifi setup
     monkeypatch.setattr(display_ui.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("nmcli bad")))

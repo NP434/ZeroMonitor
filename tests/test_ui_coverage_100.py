@@ -2,6 +2,7 @@ import json
 from types import SimpleNamespace
 
 import pygame
+import ui.utilities as utilities
 
 from ui import display_ui
 from ui.control_ui import ControlUI
@@ -42,6 +43,9 @@ class _UIControl:
     def __init__(self, bus):
         self.bus = bus
         self.stopped = 0
+        self.simulate_brightness = 100
+        self.sleep_enabled = False
+        self.sleep_time = 30
 
     def preview_brightness(self, value):
         self.last_preview = value
@@ -67,6 +71,21 @@ class _UIControl:
     def stop_system(self):
         self.stopped += 1
 
+    def set_sleep_enabled(self, enabled):
+        self.sleep_enabled = enabled
+
+    def set_sleep_time(self, seconds):
+        self.sleep_time = seconds
+
+    def update_activity(self):
+        return None
+
+    def check_sleep(self):
+        return None
+
+    def get_dimming_alpha(self):
+        return 0
+
 
 def _app(fake_bus, temp_config):
     class DummyApp(SimpleNamespace):
@@ -89,6 +108,10 @@ def _app(fake_bus, temp_config):
             "stats": {},
         },
     ]
+    main_stub = SimpleNamespace(
+        METRIC_ORDER=list(MainScreen.METRIC_ORDER),
+        METRIC_NAMES=dict(MainScreen.METRIC_NAMES),
+    )
     app = DummyApp(
         width=1024,
         height=600,
@@ -96,6 +119,8 @@ def _app(fake_bus, temp_config):
         config=temp_config,
         devices=devices,
         changed_screens=[],
+        temp_unit="C",
+        screens={"main": main_stub},
     )
     app.ui_control = _UIControl(fake_bus)
     return app
@@ -105,10 +130,9 @@ def test_control_ui_preview_brightness_on_pi(fake_bus, temp_config, monkeypatch)
     monkeypatch.setattr("builtins.open", lambda *_a, **_k: (_ for _ in ()).throw(FileNotFoundError()))
     ui = ControlUI(fake_bus, temp_config)
     ui.on_pi = True
-    called = []
-    ui._write_brightness = lambda value: called.append(value)
+    ui._save_ui_settings = lambda _settings: None
     ui.preview_brightness(33)
-    assert called == [33]
+    assert ui.simulate_brightness == 33
 
 
 def test_display_ui_remaining_paths(monkeypatch, tmp_path, fake_bus, temp_config, ui_surface):
@@ -361,7 +385,7 @@ def test_main_and_settings_remaining_paths(monkeypatch, tmp_path, fake_bus, temp
     main.device_scroll = 0
     main.draw(ui_surface)
 
-    assert "d" in main._format_metric_value("uptime_seconds", 200000)
+    assert "d" in utilities.format_metric_value("uptime_seconds", 200000)
     main.metric_viewport_rect = None
     main._clamp_metric_scroll()
     main.metric_viewport_rect = pygame.Rect(100, 100, 300, 120)
@@ -602,9 +626,4 @@ def test_main_screen_drag_guard_and_sidebar_draw_lines(monkeypatch, tmp_path, fa
     # Force off-screen list items to hit the sidebar skip branch.
     main.device_scroll = -10000
     main.draw(ui_surface)
-
-
-
-
-
 

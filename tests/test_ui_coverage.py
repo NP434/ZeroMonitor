@@ -43,6 +43,9 @@ def _asset_dict():
 class RecordingUIControl:
     def __init__(self, bus):
         self.bus = bus
+        self.simulate_brightness = 100
+        self.sleep_enabled = False
+        self.sleep_time = 30
         self.previewed = []
         self.brightness = []
         self.polling = []
@@ -53,10 +56,18 @@ class RecordingUIControl:
         self.stopped = 0
 
     def preview_brightness(self, value):
+        self.simulate_brightness = value
         self.previewed.append(value)
 
     def set_brightness(self, value):
+        self.simulate_brightness = value
         self.brightness.append(value)
+
+    def set_sleep_enabled(self, enabled):
+        self.sleep_enabled = enabled
+
+    def set_sleep_time(self, seconds):
+        self.sleep_time = seconds
 
     def change_polling_rate(self, host, new_rate):
         self.polling.append((host, new_rate))
@@ -75,6 +86,15 @@ class RecordingUIControl:
 
     def stop_system(self):
         self.stopped += 1
+
+    def update_activity(self):
+        return None
+
+    def check_sleep(self):
+        return None
+
+    def get_dimming_alpha(self):
+        return 0
 
 
 @pytest.fixture
@@ -99,6 +119,10 @@ def rich_ui_app(fake_bus, temp_config):
             "stats": {"disk": 3},
         },
     ]
+    main_stub = SimpleNamespace(
+        METRIC_ORDER=list(MainScreen.METRIC_ORDER),
+        METRIC_NAMES=dict(MainScreen.METRIC_NAMES),
+    )
     app = DummyApp(
         width=1024,
         height=600,
@@ -106,6 +130,8 @@ def rich_ui_app(fake_bus, temp_config):
         config=temp_config,
         devices=devices,
         changed_screens=[],
+        temp_unit="C",
+        screens={"main": main_stub},
     )
     app.ui_control = RecordingUIControl(fake_bus)
     return app
@@ -318,14 +344,13 @@ def test_main_screen_behavior_and_helpers(monkeypatch, tmp_path, rich_ui_app, ui
     assert screen._event_pos(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a)) is None
     assert screen._format_timestamp("2026-04-08T12:34:56.789") == "2026-04-08 12:34:56"
     assert screen._format_timestamp(123) == "123"
-    assert screen._value("missing", None) == "N/A"
-    assert screen._value("uptime_seconds", 125) == "0h 2m"
-    assert utilities._format_metric_value("net_rx_kbps", 2000) == "2.00 Mbps"
-    assert utilities._format_metric_value("net_tx_kbps", 300) == "300 kbps"
-    assert utilities._format_metric_value("mem_used_mb", 512.9) == "512 MB"
-    assert utilities._format_metric_value("cpu_load_1m", 0.1234) == "0.12"
-    assert utilities._format_metric_value("cpu_temp_c", 51.2) == "51.20 C"
-    assert utilities._format_metric_value("extra", 7) == "7"
+    assert utilities.format_metric_value("uptime_seconds", 125) == "0h 2m"
+    assert utilities.format_metric_value("net_rx_kbps", 2000) == "2.00 Mbps"
+    assert utilities.format_metric_value("net_tx_kbps", 300) == "300 kbps"
+    assert utilities.format_metric_value("mem_used_mb", 512.9, metric_units=screen.METRIC_UNITS) == "512 MB"
+    assert utilities.format_metric_value("cpu_load_1m", 0.1234) == "0.12"
+    assert utilities.format_metric_value("cpu_temp_c", 51.2) == "51.2°C"
+    assert utilities.format_metric_value("extra", 7) == "7"
 
     screen.draw(ui_surface)
     screen.selected_device = rich_ui_app.devices[0]
@@ -615,9 +640,9 @@ def test_system_dashboard_screen_behavior(monkeypatch, tmp_path, rich_ui_app, ui
     screen.handle_event(pygame.event.Event(pygame.FINGERDOWN, x=screen.network_toggle_button.rect.centerx / rich_ui_app.width, y=screen.network_toggle_button.rect.centery / rich_ui_app.height))
     screen.update()
 
-    assert utilities._format_metric_value("net_rx_kbps", 1500) == "1.50 Mbps"
-    assert utilities._format_metric_value("cpu_load_1m", 0.25) == "0.25"
-    assert utilities._format_metric_value("cpu_temp_c", 42.5) == "42.5°C"
+    assert utilities.format_metric_value("net_rx_kbps", 1500) == "1.50 Mbps"
+    assert utilities.format_metric_value("cpu_load_1m", 0.25) == "0.25"
+    assert utilities.format_metric_value("cpu_temp_c", 42.5) == "42.5°C"
     assert screen._normalize_metric_value("cpu_temp_c", 50) == 0.5
     assert screen._normalize_metric_value("custom", -10) == 0.0
     assert screen._format_history_label(None) == ""
@@ -666,6 +691,18 @@ def test_display_ui_init_handlers_and_run(monkeypatch, tmp_path, fake_bus, temp_
     class FakeControlUI:
         def __init__(self, bus):
             self.bus = bus
+            self.simulate_brightness = 100
+            self.sleep_enabled = False
+            self.sleep_time = 30
+
+        def update_activity(self):
+            return None
+
+        def check_sleep(self):
+            return None
+
+        def get_dimming_alpha(self):
+            return 0
 
     class FakeMainScreen:
         def __init__(self, app):

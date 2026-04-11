@@ -70,7 +70,7 @@ class ControlPairing:
             result = con.run("ver", hide=True, warn=True)
             if result.ok:
                 print("Windows Detected")
-                return "Windows"
+                return "windows"
 
             return "OS_Unknown"
 
@@ -170,15 +170,21 @@ class ControlPairing:
                             "allow_agent": False
                         }
                     )
-                    con.run("mkdir -p ~/.ssh && chmod 700 ~/.ssh", hide=True)
-                    con.run("touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys", hide=True)
-                    with open(self.config.ssh_pub_key, "r") as f:
-                        pub_key = f.read().strip()
-                    con.run(
-                        f'grep -qxF "{pub_key}" ~/.ssh/authorized_keys || echo "{pub_key}" >> ~/.ssh/authorized_keys',
-                        hide=True)
-                    con.close()
-                    print("Public key copied successfully")
+                    if os_info == "Linux":
+                        con.run("mkdir -p ~/.ssh && chmod 700 ~/.ssh", hide=True)
+                        con.run("touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys", hide=True)
+                        with open(self.config.ssh_pub_key, "r") as f:
+                            pub_key = f.read().strip()
+                        con.run(
+                            f'grep -qxF "{pub_key}" ~/.ssh/authorized_keys || echo "{pub_key}" >> ~/.ssh/authorized_keys',
+                            hide=True)
+                        con.close()
+                        print("Public key copied successfully")
+                    elif os_info == "windows":
+                        con.run(
+                            f'powershell -Command "New-Item -ItemType Directory -Force $env:USERPROFILE\\.ssh; Add-Content -Path $env:USERPROFILE\\.ssh\\authorized_keys -Value \'{pub_key}\'"',
+                            hide=True
+                        )
                 except Exception as e:
                     print(f"[!] Failed to copy public key: {e}")
         else:

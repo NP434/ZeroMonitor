@@ -3,6 +3,7 @@ fabric
 pygame_vkeyboard
 flask
 pytest
+coverage
 pytest-cov
 cryptography
 requests

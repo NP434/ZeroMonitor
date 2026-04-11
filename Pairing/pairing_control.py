@@ -64,7 +64,7 @@ class ControlPairing:
             result = con.run("uname", hide=True, warn=True)
             if result.ok:
                 print("Linux Detected")
-                return "Linux"
+                return "linux"
 
             # Try Windows
             result = con.run("ver", hide=True, warn=True)

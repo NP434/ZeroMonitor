@@ -22,45 +22,45 @@ def dim_background(app, surface):
     overlay.fill((0, 0, 0, 120)) 
     surface.blit(overlay, (0, 0))
 
-def format_metric_value(self, metric_name, metric_value):
-        if metric_value is None:
-            return "N/A"
+def format_metric_value(metric_name, metric_value, metric_units=None, temp_unit="C"):
+    if metric_value is None:
+        return "N/A"
 
-        # Uptime formatting
-        if metric_name == "uptime_seconds":
-            total = int(metric_value)
-            days = total // 86400
-            hours = (total % 86400) // 3600
-            mins = (total % 3600) // 60
-            if days > 0:
-                return f"{days}d {hours}h {mins}m"
-            return f"{hours}h {mins}m"
+    # Uptime formatting
+    if metric_name == "uptime_seconds":
+        total = int(metric_value)
+        days = total // 86400
+        hours = (total % 86400) // 3600
+        mins = (total % 3600) // 60
+        if days > 0:
+            return f"{days}d {hours}h {mins}m"
+        return f"{hours}h {mins}m"
 
-        # Network Formatting
-        if metric_name in {"net_rx_kbps", "net_tx_kbps"}:
-            if metric_value >= 1000:
-                return f"{metric_value / 1000.0:.2f} Mbps"
-            return f"{metric_value:.0f} kbps"
+    # Network Formatting
+    if metric_name in {"net_rx_kbps", "net_tx_kbps"}:
+        if metric_value >= 1000:
+            return f"{metric_value / 1000.0:.2f} Mbps"
+        return f"{metric_value:.0f} kbps"
 
-        # Memory Formatting
-        if metric_name in {"mem_used_mb", "mem_total_mb"}:
-            return f"{int(metric_value)}{self.METRIC_UNITS.get(metric_name, '')}"
+    # Memory Formatting
+    if metric_name in {"mem_used_mb", "mem_total_mb"}:
+        unit_str = metric_units.get(metric_name, '') if metric_units else ''
+        return f"{int(metric_value)}{unit_str}"
 
-        # CPU Temperature formatting
-        if metric_name == "cpu_temp_c":
-            unit = self.app.temp_unit
-            value = float(metric_value)
+    # CPU Temperature formatting
+    if metric_name == "cpu_temp_c":
+        value = float(metric_value)
+        if temp_unit == "F":
+            value = value * 9/5 + 32
+        return f"{value:.1f}°{temp_unit}"
 
-            if unit == "F":
-                value = value * 9/5 + 32
-            
-            return f"{value:.1f}°{unit}"
+    # CPU load formatting
+    if metric_name == "cpu_load_1m":
+        return f"{metric_value:.2f}"
 
-        # CPU load formatting
-        if metric_name == "cpu_load_1m":
-            return f"{metric_value:.2f}"
+    if isinstance(metric_value, float):
+        unit_str = metric_units.get(metric_name, '') if metric_units else ''
+        return f"{metric_value:.2f}{unit_str}"
 
-        if isinstance(metric_value, float):
-            return f"{metric_value:.2f}{self.METRIC_UNITS.get(metric_name, '')}"
-
-        return f"{metric_value}{self.METRIC_UNITS.get(metric_name, '')}"
+    unit_str = metric_units.get(metric_name, '') if metric_units else ''
+    return f"{metric_value}{unit_str}"

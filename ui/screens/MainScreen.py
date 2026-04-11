@@ -394,7 +394,12 @@ class MainScreen(BaseScreen):
 
                 friendly_name = self.METRIC_NAMES.get(metric_name, metric_name.replace("_", " ").title())
                 severity = severities.get(metric_name, "normal")
-                value_text = utilities.format_metric_value(metric_name, metric_value)
+                value_text = utilities.format_metric_value(
+                    metric_name,
+                    metric_value,
+                    metric_units=self.METRIC_UNITS,
+                    temp_unit=self.app.temp_unit
+                )
                 self._draw_metric_card(surface, rect, friendly_name, value_text, severity)
 
             surface.set_clip(old_clip)

@@ -220,3 +220,19 @@ def test_driver_dispatch_breaks_before_publish_when_stopped(fake_bus, temp_confi
     d._dispatch_metrics()
     assert published == []
 
+
+def test_driver_pause_polling_persist_error_still_acks(fake_bus, temp_config, monkeypatch):
+    d = Driver(fake_bus, temp_config)
+    d.polling_agent = DummyPollingAgent(None)
+
+    class NodeObj:
+        polling_paused = False
+
+    d.polling_agent.workers["A"] = (NodeObj(), None)
+
+    monkeypatch.setattr(drv, "load", lambda *_: (_ for _ in ()).throw(RuntimeError("bad json")))
+
+    d._on_pause_polling({"device": "A", "paused": True})
+    assert ("ACK_POLLING_PAUSED", {"device": "A", "paused": True}) in fake_bus.published
+
+

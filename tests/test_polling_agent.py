@@ -463,3 +463,23 @@ def test_persistent_connection_aborts_when_paused(monkeypatch):
         assert "pause" in str(e).lower()
 
 
+def test_persistent_connection_aborts_before_attempt_when_already_paused(monkeypatch):
+    called = {"n": 0}
+
+    class NeverUsedFabric:
+        def __init__(self, **kwargs):
+            called["n"] += 1
+
+    monkeypatch.setattr(pa, "Connection", lambda **kwargs: NeverUsedFabric(**kwargs))
+
+    conn = PersistentConnection("h", "u", "k", max_retries=2)
+
+    try:
+        conn.run("echo", node_name="node1", pause_check=lambda: True)
+        assert False, "Expected immediate pause abort"
+    except RuntimeError as e:
+        assert "pause" in str(e).lower()
+
+    assert called["n"] == 0
+
+

@@ -375,3 +375,27 @@ def test_resolve_email_recipient_falls_back_when_settings_missing(fake_bus, temp
     assert itp._resolve_email_recipient() == "fallback@example.com"
 
 
+def test_resolve_email_recipient_branch_paths(fake_bus, temp_config, tmp_path):
+    itp = _mk_interpreter(fake_bus, temp_config, tmp_path, email_to="fallback@example.com")
+
+    # Invalid JSON should fall back.
+    with open(temp_config.email_settings, "w", encoding="utf-8") as f:
+        f.write("not-json")
+    assert itp._resolve_email_recipient() == "fallback@example.com"
+
+    # Non-dict JSON should also fall back.
+    with open(temp_config.email_settings, "w", encoding="utf-8") as f:
+        json.dump(["not", "a", "dict"], f)
+    assert itp._resolve_email_recipient() == "fallback@example.com"
+
+    # Explicit email keys without a valid configured address should disable sending.
+    with open(temp_config.email_settings, "w", encoding="utf-8") as f:
+        json.dump({"email_configured": True, "email_address": ""}, f)
+    assert itp._resolve_email_recipient() is None
+
+    # Settings with no email keys should use fallback recipient.
+    with open(temp_config.email_settings, "w", encoding="utf-8") as f:
+        json.dump({"some_other_setting": True}, f)
+    assert itp._resolve_email_recipient() == "fallback@example.com"
+
+

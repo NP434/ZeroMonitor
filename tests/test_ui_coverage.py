@@ -555,6 +555,7 @@ def test_settings_screen_behavior_and_rendering(monkeypatch, rich_ui_app, ui_sur
     poll_dropdown = next(widget for key, widget in screen.device_settings_widgets if key == "poll_rate")
     toggle = next(widget for key, widget in screen.device_settings_widgets if key == "polling_paused")
     screen.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=poll_dropdown.rect.center))
+    assert poll_dropdown.expanded is True
     screen.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=(poll_dropdown.rect.x + 10, poll_dropdown.rect.bottom + poll_dropdown.option_height * 3 + 10)))
     screen.show_custom_textbox = True
     screen.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=screen.custom_textbox.rect.center))

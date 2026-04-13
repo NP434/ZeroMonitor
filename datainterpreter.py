@@ -107,6 +107,7 @@ class DataInterpreter:
         interpreted = self._annotate_severity(interpreted)
         interpreted["status"] = "online"
         interpreted["success"] = True
+        interpreted["last_success_timestamp"] = interpreted.get("timestamp")
 
         # Persist interpreted metrics to JSON file (updates per-node entry)
         try:
@@ -235,6 +236,7 @@ class DataInterpreter:
             "status": "offline",
             "success": False,
             "error": metric_event.payload.get("error", "SSH command failed"),
+            "last_success_timestamp": existing_entry.get("last_success_timestamp"),
             "metrics": existing_entry.get("metrics", {}),
             "severities": existing_entry.get("severities", {}),
         }
@@ -250,6 +252,14 @@ class DataInterpreter:
             return
 
         stored_entry = dict(interpreted)
+        previous_entry = data.get(node, {}) if isinstance(data.get(node, {}), dict) else {}
+
+        if "last_success_timestamp" not in stored_entry:
+            stored_entry["last_success_timestamp"] = previous_entry.get("last_success_timestamp")
+
+        if stored_entry.get("status") == "online" and not stored_entry.get("last_success_timestamp"):
+            stored_entry["last_success_timestamp"] = stored_entry.get("timestamp")
+
         if stored_entry.get("status") == "online":
             stored_entry.pop("error", None)
 
@@ -265,9 +275,37 @@ class DataInterpreter:
         self._write_to_json_file(offline_payload)
         logging.info(f"[DataInterpreter] Marked device '{metric_event.node}' as OFFLINE at {metric_event.timestamp}")
 
+    def _resolve_email_recipient(self):
+        settings_path = getattr(self.config, "email_settings", None)
+        if not settings_path or not os.path.exists(settings_path):
+            return self.email_to
+
+        try:
+            with open(settings_path, "r", encoding="utf-8") as f:
+                settings = json.load(f)
+        except Exception:
+            return self.email_to
+
+        if not isinstance(settings, dict):
+            return self.email_to
+
+        if settings.get("email_opt_out"):
+            return None
+
+        configured_email = str(settings.get("email_address") or "").strip()
+        if settings.get("email_configured") and configured_email:
+            return configured_email
+
+        # Explicit settings without a valid configured address means don't send.
+        if any(key in settings for key in ("email_configured", "email_opt_out", "email_address")):
+            return None
+
+        return self.email_to
+
     # Email sending for warnings (no-op if SMTP not configured)
     def _send_warning_email(self, interpreted):
-        if not (self.smtp_server and self.smtp_port and self.email_from and self.email_to):
+        recipient = self._resolve_email_recipient()
+        if not (self.smtp_server and self.smtp_port and self.email_from and recipient):
             # SMTP not configured: skip sending
             return
 
@@ -279,7 +317,7 @@ class DataInterpreter:
 
             msg = EmailMessage()
             msg["From"] = self.email_from
-            msg["To"] = self.email_to
+            msg["To"] = recipient
             msg["Subject"] = subject
             msg.set_content(body)
 

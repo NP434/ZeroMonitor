@@ -156,22 +156,13 @@ class DisplayUI:
 
         # If currently in SettingsScreen, rebuild widgets
         if isinstance(self.current_screen, SettingsScreen):
+            if hasattr(self.current_screen, "on_polling_ack"):
+                self.current_screen.on_polling_ack(name, "pause")
             self.current_screen._build_settings_widgets()
 
     def _on_ack_update_polling_rate(self, payload):
         host = payload["host"]
         rate = payload["poll_rate"]
-
-        if isinstance(self.current_screen, SettingsScreen):
-            screen = self.current_screen
-
-            # Commit name change FIRST, before any rebuilds
-            if getattr(screen, "pending_name_change", None):
-                old_name, new_name = screen.pending_name_change
-                screen.pending_polling_change = False
-                screen._commit_name_change(old_name, new_name)
-                screen.unsaved_changes = False
-                return
 
         # No pending name change — safe to update and rebuild now
         for d in self.devices:
@@ -180,8 +171,13 @@ class DisplayUI:
 
         if isinstance(self.current_screen, SettingsScreen):
             screen = self.current_screen
-            screen.pending_polling_change = False
-            screen.unsaved_changes = False
+            if hasattr(screen, "on_polling_ack"):
+                screen.on_polling_ack(host, "rate")
+            elif getattr(screen, "pending_name_change", None):
+                old_name, new_name = screen.pending_name_change
+                screen.pending_polling_change = False
+                screen._commit_name_change(old_name, new_name)
+                screen.unsaved_changes = False
             screen._build_device_list()
             screen._build_settings_widgets()
 

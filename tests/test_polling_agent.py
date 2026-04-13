@@ -427,3 +427,39 @@ def test_persistent_connection_open_password_branch(monkeypatch):
     assert created["host"] == "host"
     assert created["user"] == "user"
 
+
+def test_persistent_connection_aborts_when_paused(monkeypatch):
+    class AlwaysFailFabric:
+        def __init__(self, **kwargs):
+            pass
+
+        def run(self, *_args, **_kwargs):
+            raise RuntimeError("timeout")
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(pa, "Connection", lambda **kwargs: AlwaysFailFabric(**kwargs))
+    monkeypatch.setattr(pa.time, "sleep", lambda *_: None)
+
+    conn = PersistentConnection("h", "u", "k", max_retries=5)
+    paused = {"value": False}
+
+    def pause_check():
+        return paused["value"]
+
+    # Pause becomes true after first failure so retries abort immediately.
+    def flip_pause(*_args, **_kwargs):
+        paused["value"] = True
+        raise RuntimeError("timeout")
+
+    conn.conn = AlwaysFailFabric()
+    conn.conn.run = flip_pause
+
+    try:
+        conn.run("echo", node_name="node1", pause_check=pause_check)
+        assert False, "Expected pause abort"
+    except RuntimeError as e:
+        assert "pause" in str(e).lower()
+
+

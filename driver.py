@@ -277,6 +277,27 @@ class Driver:
         device = payload["device"]
         paused = payload["paused"]
 
+        # Persist pause state so it survives config reloads and restarts.
+        try:
+            with open(self.config.decrypted_list, "r") as f:
+                data = load(f)
+
+            updated = False
+            for item in data.values():
+                if item.get("name") == device:
+                    item["polling_paused"] = bool(paused)
+                    updated = True
+                    break
+
+            if updated:
+                with open(self.config.decrypted_list, "w") as f:
+                    import json
+                    json.dump(data, f, indent=4)
+            else:
+                logging.warning(f"Pause request for unknown device in config: {device}")
+        except Exception as e:
+            logging.error(f"Failed to persist pause state for {device}: {e}")
+
         # Update internal node state
         node_entry = self.polling_agent.workers.get(device)
         if node_entry:
@@ -340,6 +361,7 @@ def load_targets(config) -> list:
         name = item.get("name")
         os_type = (item.get("operating_system") or "").lower()
         poll_freq = int(item.get("polling_frequency", 5))
+        polling_paused = bool(item.get("polling_paused", False))
         password = item.get("Pword")  # Add this line
 
         conn = PersistentConnection(
@@ -362,6 +384,11 @@ def load_targets(config) -> list:
             )
             continue
 
-        nodes.append(Node(name=name, provider=provider, interval=poll_freq))
+        nodes.append(Node(
+            name=name,
+            provider=provider,
+            interval=poll_freq,
+            polling_paused=polling_paused,
+        ))
     # Returns list of node objects
     return nodes

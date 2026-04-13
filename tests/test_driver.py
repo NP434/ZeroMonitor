@@ -94,6 +94,7 @@ def test_driver_update_polling_rate_add_remove_reload_and_name(fake_bus, temp_co
 
 
 def test_driver_pause_dispatch_and_handle_remove(fake_bus, temp_config):
+    _write_devices(temp_config.decrypted_list, {"k1": {"name": "A", "polling_paused": False}})
     d = Driver(fake_bus, temp_config)
     d.polling_agent = DummyPollingAgent(None)
     node = SimpleNamespace(polling_paused=False)
@@ -101,6 +102,9 @@ def test_driver_pause_dispatch_and_handle_remove(fake_bus, temp_config):
 
     d._on_pause_polling({"device": "A", "paused": True})
     assert node.polling_paused is True
+    with open(temp_config.decrypted_list, "r", encoding="utf-8") as f:
+        persisted = json.load(f)
+    assert persisted["k1"]["polling_paused"] is True
 
     d._on_pause_polling({"device": "missing", "paused": True})
 
@@ -124,7 +128,7 @@ def test_load_targets_variants(temp_config, monkeypatch):
     _write_devices(
         temp_config.decrypted_list,
         {
-            "n1": {"hostname": "h", "user": "u", "name": "L", "operating_system": "linux", "polling_frequency": 2},
+            "n1": {"hostname": "h", "user": "u", "name": "L", "operating_system": "linux", "polling_frequency": 2, "polling_paused": True},
             "n2": {"hostname": "h2", "user": "u2", "name": "W", "operating_system": "windows", "polling_frequency": 3},
             "n3": {"hostname": "h3", "user": "u3", "name": "X", "operating_system": "other", "polling_frequency": 1},
         },
@@ -137,6 +141,8 @@ def test_load_targets_variants(temp_config, monkeypatch):
     nodes = load_targets(temp_config)
     assert len(nodes) == 2
     assert {n.name for n in nodes} == {"L", "W"}
+    linux_node = next(n for n in nodes if n.name == "L")
+    assert linux_node.polling_paused is True
 
     temp_config.decrypted_list = str((SimpleNamespace()).__class__)  # impossible path
     # Force missing file branch

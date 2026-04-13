@@ -45,7 +45,7 @@ class MetricsProvider(ABC):
         self.conn = conn
 
     @abstractmethod
-    def collect(self, node_name: str, stop_event=None) -> SystemMetrics:
+    def collect(self, node_name: str, stop_event=None, pause_check=None) -> SystemMetrics:
         """Abstract method to be implemented by subclasses"""
         pass
 
@@ -74,7 +74,7 @@ class LinuxMetricsProvider(MetricsProvider):
         self._prev_net_tx_bytes = None
         self._prev_net_ts = None
 
-    def collect(self, node_name: str, stop_event=None) -> SystemMetrics:
+    def collect(self, node_name: str, stop_event=None, pause_check=None) -> SystemMetrics:
         """Linux specific metrics provider"""
         cmd = r"""
 HOST=$(hostname)
@@ -102,7 +102,8 @@ echo "NET=$NET"
             hide=True,
             timeout=10,
             node_name=node_name,
-            stop_event=stop_event
+            stop_event=stop_event,
+            pause_check=pause_check
         )
         data = {}
 
@@ -191,7 +192,7 @@ class WindowsMetricsProvider(MetricsProvider):
     def __init__(self, conn: Connection):
         super().__init__(conn)
 
-    def collect(self, node_name: str, stop_event=None) -> SystemMetrics:
+    def collect(self, node_name: str, stop_event=None, pause_check=None) -> SystemMetrics:
         """Windows specific metrics provider"""
         cmd = r"""
 powershell -Command "
@@ -220,7 +221,8 @@ Write-Output \"NET_TX_BPS=$($tx.Sum)\"
             hide=True,
             timeout=10,
             node_name=node_name,
-            stop_event=stop_event
+            stop_event=stop_event,
+            pause_check=pause_check
         )
         data = {}
 
@@ -316,17 +318,21 @@ class PersistentConnection:
                     connect_kwargs=connect_kwargs
                 )
 
-    def run(self, cmd, node_name=None, stop_event=None, **kwargs):
+    def run(self, cmd, node_name=None, stop_event=None, pause_check=None, **kwargs):
         """Run a command with automatic reconnect and retries"""
         retries = 0
         # If we are under max retries
         while retries < self.max_retries:
+            if pause_check and pause_check():
+                raise RuntimeError("Command aborted due to pause")
             try:
                 # Try to open connection
                 self.open()
                 # return successful connection
                 return self.conn.run(cmd, **kwargs)
             except Exception as e:
+                if pause_check and pause_check():
+                    raise RuntimeError("Command aborted due to pause")
                 # else, record error, and retry
                 name = node_name if node_name else self.host
                 logging.warning(
@@ -345,8 +351,9 @@ class PersistentConnection:
                 # exponential backoff for connection retries, max 10 seconds
                 sleep_time = min(2 ** retries, 10)
 
-                if stop_event and stop_event.wait(sleep_time):
-                    raise RuntimeError("Command aborted due to shutdown")
+                if stop_event:
+                    if stop_event.wait(sleep_time):
+                        raise RuntimeError("Command aborted due to shutdown")
                 else:
                     time.sleep(sleep_time)
 
@@ -430,6 +437,9 @@ class PollingAgent:
         old_node, _ = self.workers[name]
         new_node = new_map[name]
 
+        # Keep pause state in sync even when interval does not change.
+        old_node.polling_paused = new_node.polling_paused
+
         # If interval has changed, reload worker with new settings
         if new_node.interval != old_node.interval:
             logging.info("Reloading worker: %s", name)
@@ -496,7 +506,8 @@ def run_node(node: Node, queue: Queue):
 
                 metrics = node.provider.collect(
                     node.name,
-                    stop_event=stop_event
+                    stop_event=stop_event,
+                    pause_check=lambda: node.polling_paused
                 )
                 
                 logger.info("metrics collected successfully for %s", node.name)

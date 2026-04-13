@@ -1,5 +1,4 @@
 import json
-from types import SimpleNamespace
 
 import datainterpreter as di
 from datainterpreter import DataInterpreter
@@ -61,6 +60,7 @@ def test_process_and_severity_and_write_online(fake_bus, temp_config, tmp_path):
     with open(itp.json_filepath, "r", encoding="utf-8") as f:
         data = json.load(f)
     assert "error" not in data["node1"]
+    assert data["node1"]["last_success_timestamp"] == data["node1"]["timestamp"]
 
 
 def test_offline_payload_and_interpret_failure(fake_bus, temp_config, tmp_path):
@@ -87,6 +87,7 @@ def test_offline_payload_and_interpret_failure(fake_bus, temp_config, tmp_path):
         "status": "offline",
         "success": False,
         "error": "ssh failed",
+        "last_success_timestamp": "t0",
         "metrics": {"cpu_temp_c": 50},
         "severities": {"cpu_temp_c": "normal"},
     }) in fake_bus.published
@@ -294,3 +295,83 @@ def test_send_warning_email_logs_failure(fake_bus, temp_config, tmp_path, monkey
     itp = _mk_interpreter(fake_bus, temp_config, tmp_path)
     itp._send_warning_email({"node": "n"})
     assert any("Failed to send warning email" in msg for msg in logs)
+
+
+def test_send_warning_email_uses_configured_email_settings(fake_bus, temp_config, tmp_path, monkeypatch):
+    sent_to = []
+
+    class SMTPSSL:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def login(self, *args, **kwargs):
+            return None
+
+        def send_message(self, msg):
+            sent_to.append(msg["To"])
+
+    with open(temp_config.email_settings, "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "email_configured": True,
+                "email_address": "configured@example.com",
+                "email_opt_out": False,
+            },
+            f,
+        )
+
+    monkeypatch.setattr(di.smtplib, "SMTP_SSL", SMTPSSL)
+
+    itp = _mk_interpreter(fake_bus, temp_config, tmp_path, email_to="fallback@example.com")
+    itp._send_warning_email({"node": "n"})
+
+    assert sent_to == ["configured@example.com"]
+
+
+def test_send_warning_email_skips_when_email_settings_opt_out(fake_bus, temp_config, tmp_path, monkeypatch):
+    calls = []
+
+    class SMTPSSL:
+        def __init__(self, *args, **kwargs):
+            calls.append("init")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def login(self, *args, **kwargs):
+            calls.append("login")
+
+        def send_message(self, msg):
+            calls.append(msg["To"])
+
+    with open(temp_config.email_settings, "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "email_configured": False,
+                "email_address": "",
+                "email_opt_out": True,
+            },
+            f,
+        )
+
+    monkeypatch.setattr(di.smtplib, "SMTP_SSL", SMTPSSL)
+
+    itp = _mk_interpreter(fake_bus, temp_config, tmp_path, email_to="fallback@example.com")
+    assert itp._send_warning_email({"node": "n"}) is None
+    assert calls == []
+
+
+def test_resolve_email_recipient_falls_back_when_settings_missing(fake_bus, temp_config, tmp_path):
+    itp = _mk_interpreter(fake_bus, temp_config, tmp_path, email_to="fallback@example.com")
+    assert itp._resolve_email_recipient() == "fallback@example.com"
+
+

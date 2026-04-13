@@ -342,10 +342,11 @@ class MainScreen(BaseScreen):
             device_data = self.cache_data.get(device_name_key, {})
             metrics = device_data.get("metrics", {})
             severities = device_data.get("severities", {})
-            timestamp = self._format_timestamp(device_data.get("timestamp", "N/A"))
+            success_ts = device_data.get("last_success_timestamp")
+            timestamp = self._format_timestamp(success_ts if success_ts else "N/A")
 
             # Timestamp with better styling
-            timestamp_text = theme.FONT_SMALL.render(f"Last updated: {timestamp}", True, theme.LIGHT_GRAY)
+            timestamp_text = theme.FONT_SMALL.render(f"Last successful poll: {timestamp}", True, theme.LIGHT_GRAY)
             surface.blit(timestamp_text, (content_left, theme.TOPBAR_HEIGHT + 75))
 
             # Build a stable metric list with preferred order first, then any extras.

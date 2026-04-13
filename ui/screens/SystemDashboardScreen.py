@@ -392,13 +392,13 @@ class SystemDashboardScreen(BaseScreen):
         # Offline Devices Box
         self._draw_status_box(surface, status_x + ((box_width + box_gap) * 2), box_y, box_width, box_height, "Offline", str(offline), theme.RED)
 
-        # Draw Aggregated Metrics Section
+        # Draw Selected Device Metrics + Graph Section
         metrics_section_y = box_y + box_height + theme.MARGIN_LARGE
-        metrics_title = theme.FONT_LARGE.render("Network & System Averages", True, theme.BRIGHT_BLUE)
+        metrics_title = theme.FONT_LARGE.render("Selected Device Metrics", True, theme.BRIGHT_BLUE)
         metrics_title_rect = metrics_title.get_rect(center=(content_center_x, metrics_section_y + 14))
         surface.blit(metrics_title, metrics_title_rect)
 
-        # Get aggregated metrics
+        # Keep averages for dashboard-level availability checks/history updates.
         averages = self._calculate_aggregated_metrics()
 
         if averages:
@@ -413,7 +413,7 @@ class SystemDashboardScreen(BaseScreen):
 
             selected_metrics = self._get_selected_graph_metrics() or {}
             graph_metrics = self._get_active_graph_metrics(selected_metrics)
-            self._draw_metrics_table(surface, table_rect, averages, graph_metrics)
+            self._draw_metrics_table(surface, table_rect, selected_metrics, graph_metrics)
             self._draw_metrics_graph(surface, graph_rect, selected_metrics, graph_metrics)
         else:
             no_data_font = theme.FONT_MEDIUM
@@ -438,33 +438,49 @@ class SystemDashboardScreen(BaseScreen):
         value_rect = value_text.get_rect(center=(x + width // 2, y + height // 2 + 8))
         surface.blit(value_text, value_rect)
 
-    def _draw_metrics_table(self, surface, rect, averages, graph_metrics):
-        """Draw a table of averaged metrics with better formatting"""
+    def _draw_metrics_table(self, surface, rect, selected_metrics, graph_metrics):
+        """Draw selected-device metrics with better formatting."""
         pygame.draw.rect(surface, theme.CARD_BG, rect, border_radius=theme.CARD_CORNER_RADIUS)
         pygame.draw.rect(surface, theme.BLUE, rect, theme.CARD_BORDER_WIDTH, border_radius=theme.CARD_CORNER_RADIUS)
 
-        title_text = theme.FONT_MEDIUM.render("Averages", True, theme.WHITE)
+        title_text = theme.FONT_MEDIUM.render("Device Metrics", True, theme.WHITE)
         surface.blit(title_text, (rect.x + theme.CARD_PADDING, rect.y + theme.CARD_PADDING))
+
+        selected_name = self.selected_graph_device or "No device"
+        selected_name_text = theme.FONT_SMALL.render(selected_name, True, theme.LIGHTER_GRAY)
+        surface.blit(selected_name_text, (rect.x + theme.CARD_PADDING, rect.y + theme.CARD_PADDING + 22))
 
         legend_lane_width = 116
         lane_gap = 10
         metrics_rect = pygame.Rect(
             rect.x + theme.CARD_PADDING,
-            rect.y + 40,
+            rect.y + 54,
             max(120, rect.width - legend_lane_width - lane_gap - (theme.CARD_PADDING * 2)),
-            rect.height - 48,
+            rect.height - 62,
         )
         legend_rect = pygame.Rect(
             metrics_rect.right + lane_gap,
-            rect.y + 44,
+            rect.y + 58,
             max(96, rect.right - theme.CARD_PADDING - (metrics_rect.right + lane_gap)),
-            rect.height - 54,
+            rect.height - 68,
         )
 
         visible_metrics = [
             metric_key for metric_key in self.METRIC_LABELS
-            if averages.get(metric_key) is not None
+            if selected_metrics.get(metric_key) is not None
         ]
+
+        if not self.selected_graph_device:
+            empty_text = theme.FONT_SMALL.render("No device selected", True, theme.LIGHT_GRAY)
+            surface.blit(empty_text, (metrics_rect.x, metrics_rect.y + 4))
+            self._draw_averages_color_key(surface, legend_rect, graph_metrics)
+            return
+
+        if not visible_metrics:
+            empty_text = theme.FONT_SMALL.render("No metrics for selected device", True, theme.LIGHT_GRAY)
+            surface.blit(empty_text, (metrics_rect.x, metrics_rect.y + 4))
+            self._draw_averages_color_key(surface, legend_rect, graph_metrics)
+            return
 
         available_rows_height = max(120, metrics_rect.height - 8)
         row_height = max(28, min(40, available_rows_height // max(1, len(visible_metrics))))
@@ -477,7 +493,7 @@ class SystemDashboardScreen(BaseScreen):
         displayed = 0
 
         for metric_key, metric_label in self.METRIC_LABELS.items():
-            if metric_key not in averages or averages[metric_key] is None:
+            if metric_key not in selected_metrics or selected_metrics[metric_key] is None:
                 continue
 
             if current_y + row_height > metrics_rect.bottom:
@@ -503,7 +519,7 @@ class SystemDashboardScreen(BaseScreen):
             surface.blit(label_text, (metrics_rect.x, current_y))
 
             # Format value
-            value = averages[metric_key]
+            value = selected_metrics[metric_key]
             value_str = utilities.format_metric_value(metric_key, value)
 
             # Draw value with accent color
@@ -527,11 +543,12 @@ class SystemDashboardScreen(BaseScreen):
         subtitle_rect = subtitle_text.get_rect(topright=(rect.right - theme.CARD_PADDING, rect.y + theme.CARD_PADDING + 2))
         surface.blit(subtitle_text, subtitle_rect)
 
+        controls_top = rect.y + 36
         toggle_width = 104
         toggle_height = 26
         self.network_toggle_button.rect = pygame.Rect(
             rect.right - toggle_width - theme.CARD_PADDING,
-            rect.y + 36,
+            controls_top,
             toggle_width,
             toggle_height,
         )
@@ -539,9 +556,22 @@ class SystemDashboardScreen(BaseScreen):
         self.network_toggle_button.bg_color = theme.BLUE if self.show_network_lines else (55, 55, 55)
         self.network_toggle_button.draw(surface)
 
-        device_label = theme.FONT_SMALL.render("Device", True, theme.LIGHTER_GRAY)
-        surface.blit(device_label, (rect.x + theme.CARD_PADDING, rect.y + 40))
-        self.device_selector.rect = pygame.Rect(rect.x + theme.CARD_PADDING, rect.y + 56, 176, 30)
+        selector_width = max(132, min(176, rect.width - (theme.CARD_PADDING * 2) - 10))
+        selector_y = controls_top + 16
+        max_selector_y = rect.bottom - 36
+        selector_y = min(selector_y, max_selector_y)
+
+        device_label_y = selector_y - 16
+        if device_label_y > rect.y + theme.CARD_PADDING + 2:
+            device_label = theme.FONT_SMALL.render("Device", True, theme.LIGHTER_GRAY)
+            surface.blit(device_label, (rect.x + theme.CARD_PADDING, device_label_y))
+
+        self.device_selector.rect = pygame.Rect(
+            rect.x + theme.CARD_PADDING,
+            selector_y,
+            selector_width,
+            30,
+        )
         self.device_selector.draw(surface)
 
         if self.device_selector.expanded:
@@ -559,12 +589,14 @@ class SystemDashboardScreen(BaseScreen):
             surface.blit(no_data_text, no_data_rect)
             return
 
+        controls_bottom = max(self.network_toggle_button.rect.bottom, self.device_selector.rect.bottom)
         bottom_reserved = 44 if not self.show_network_lines else 26
+        chart_top = min(controls_bottom + 10, rect.bottom - 48)
         chart_rect = pygame.Rect(
             rect.x + 56,
-            rect.y + 58,
+            chart_top,
             rect.width - 72,
-            max(80, rect.height - 58 - bottom_reserved),
+            max(80, rect.bottom - chart_top - bottom_reserved),
         )
 
         if chart_rect.width <= 40 or chart_rect.height <= 40:

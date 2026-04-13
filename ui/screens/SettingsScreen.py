@@ -52,6 +52,10 @@ class SettingsScreen(BaseScreen):
         self.pending_name_change = None
         self.pending_polling_change = False
         self._pending_backend_name = None
+        self._pending_polling_rate_ack = False
+        self._pending_polling_pause_ack = False
+        self._original_polling_frequency = None
+        self._original_polling_paused = False
         self.sidebar_width = 220
         self.scroll_offset = 0
         self.show_custom_textbox = False
@@ -262,8 +266,6 @@ class SettingsScreen(BaseScreen):
             if key.startswith("visible_"):
                 if widget.value:
                     visible_metrics.append(key[8:])
-            elif key == "polling_paused":
-                device["polling_paused"] = widget.value
         device["visible_metrics"] = visible_metrics
 
     def _build_settings_widgets(self):
@@ -291,6 +293,8 @@ class SettingsScreen(BaseScreen):
 
         # ── Polling frequency row ──────────────────────────────────────────
         poll_seconds  = int(device.get("polling_frequency", 15))
+        self._original_polling_frequency = poll_seconds
+        self._original_polling_paused = bool(device.get("polling_paused", False))
         default_label = self._polling_label(poll_seconds)
 
         poll_dropdown = DropDown(
@@ -354,6 +358,15 @@ class SettingsScreen(BaseScreen):
         if not self.unsaved_changes or not self.selected_device:
             return
 
+        # Allow a fresh apply attempt if external logic already cleared pending state.
+        if not self.pending_polling_change:
+            self._pending_polling_rate_ack = False
+            self._pending_polling_pause_ack = False
+            device = self._get_device(self.selected_device)
+            if device:
+                self._original_polling_frequency = int(device.get("polling_frequency", 15))
+                self._original_polling_paused = bool(device.get("polling_paused", False))
+
         # Flush all widget state to device dict first
         self._collect_widget_state()
 
@@ -363,27 +376,37 @@ class SettingsScreen(BaseScreen):
 
         # Capture backend name once before anything mutates it
         backend_name = self.original_name if self.pending_name_change else self.selected_device
-        has_polling_update = False
+        selected_rate = None
+        selected_paused = None
 
         for key, widget in self.device_settings_widgets:
             if key == "poll_rate":
                 if widget.selected == "Custom":
-                    numeric = device.get("polling_frequency", 15)
+                    try:
+                        numeric = int(self.custom_textbox.txt) if self.show_custom_textbox else int(device.get("polling_frequency", 15))
+                    except (TypeError, ValueError):
+                        numeric = int(device.get("polling_frequency", 15))
                 else:
                     numeric = self.POLLING_MAP.get(widget.selected, 15)
+                selected_rate = int(numeric)
 
-                if numeric != device.get("polling_frequency", 15):
-                    has_polling_update = True
-                    self.app.ui_control.change_polling_rate(backend_name, numeric)
-                    device["polling_frequency"] = numeric
+                if int(numeric) != int(self._original_polling_frequency):
+                    self.app.ui_control.change_polling_rate(backend_name, int(numeric))
+                    device["polling_frequency"] = int(numeric)
                     self.app.bus.publish("SYNC_VAULT", {})
+                    self._pending_polling_rate_ack = True
+                else:
+                    self._pending_polling_rate_ack = False
 
             if key == "polling_paused":
-                if widget.value != device.get("polling_paused", False):
-                    has_polling_update = True
+                selected_paused = bool(widget.value)
+                if bool(widget.value) != bool(self._original_polling_paused):
                     self.app.ui_control.pause_polling(backend_name, widget.value)
                     device["polling_paused"] = widget.value
                     self.app.bus.publish("SYNC_VAULT", {})
+                    self._pending_polling_pause_ack = True
+                else:
+                    self._pending_polling_pause_ack = False
 
         # Apply visible metrics immediately — no ack needed
         visible_metrics = [
@@ -393,13 +416,18 @@ class SettingsScreen(BaseScreen):
         device["visible_metrics"] = visible_metrics
         self.app.bus.publish("SYNC_VAULT", {})
 
-        self.pending_polling_change = has_polling_update
+        self.pending_polling_change = (self._pending_polling_rate_ack or self._pending_polling_pause_ack)
 
         if self.pending_polling_change:
             # Store backend name so ack handler can match correctly
             self._pending_backend_name = backend_name
             self.unsaved_changes = True
             return
+
+        if selected_rate is not None:
+            self._original_polling_frequency = int(selected_rate)
+        if selected_paused is not None:
+            self._original_polling_paused = bool(selected_paused)
 
         if self.pending_name_change:
             old_name, new_name = self.pending_name_change
@@ -449,6 +477,8 @@ class SettingsScreen(BaseScreen):
 
         self.pending_name_change = None
         self.pending_polling_change = False
+        self._pending_polling_rate_ack = False
+        self._pending_polling_pause_ack = False
 
     def _clamp_device_scroll(self):
         max_scroll = max(0, self.device_settings_height - (self.app.height - CONTENT_Y))
@@ -638,10 +668,10 @@ class SettingsScreen(BaseScreen):
             scrolled_pos = (pos[0], pos[1] + self.device_scroll)
 
             for key, widget in self.device_settings_widgets:
-                result = widget.handle_event_at(scrolled_pos) if hasattr(widget, 'handle_event_at') else widget.handle_event(event)
-
-                if result is None:
-                    # Fall back to rect-based check with scrolled pos
+                # Handle each widget exactly once to avoid dropdown open/close double toggles.
+                if hasattr(widget, 'handle_event_at'):
+                    result = widget.handle_event_at(scrolled_pos)
+                else:
                     original_y = widget.rect.y
                     widget.rect.y -= self.device_scroll
                     result = widget.handle_event(event)
@@ -653,13 +683,12 @@ class SettingsScreen(BaseScreen):
                 if key == "poll_rate":
                     if result == "Custom":
                         self._activate_custom_polling()
-                        continue
                     else:
                         self._deactivate_custom_polling()
-
-                device = self._get_device(self.selected_device)
-                if device:
-                    device[key] = result
+                elif key.startswith("visible_"):
+                    device = self._get_device(self.selected_device)
+                    if device:
+                        device[key] = result
                 self.unsaved_changes = True
 
             # Custom textbox / numpad
@@ -742,7 +771,6 @@ class SettingsScreen(BaseScreen):
             try:
                 val = int(self.custom_textbox.txt)
                 if 5 <= val <= 6000:
-                    device["polling_frequency"] = val
                     self.unsaved_changes = True
                     self.custom_error_message = None
                 else:
@@ -755,6 +783,33 @@ class SettingsScreen(BaseScreen):
             return
         else:
             self.custom_textbox.consume(key)
+
+    def on_polling_ack(self, device_name, kind):
+        """Handle polling ACKs so Apply state clears only after all pending changes finish."""
+        if self._pending_backend_name and device_name != self._pending_backend_name:
+            return
+
+        if kind == "rate":
+            self._pending_polling_rate_ack = False
+        elif kind == "pause":
+            self._pending_polling_pause_ack = False
+
+        self.pending_polling_change = (self._pending_polling_rate_ack or self._pending_polling_pause_ack)
+        if self.pending_polling_change:
+            return
+
+        self._pending_backend_name = None
+
+        if self.pending_name_change:
+            old_name, new_name = self.pending_name_change
+            self._commit_name_change(old_name, new_name)
+
+        device = self._get_device(self.selected_device)
+        if device:
+            self._original_polling_frequency = int(device.get("polling_frequency", 15))
+            self._original_polling_paused = bool(device.get("polling_paused", False))
+
+        self.unsaved_changes = False
 
     # ══════════════════════════════════════════════════════════════════════
     # Drawing

@@ -167,6 +167,10 @@ class MainScreen(BaseScreen):
         self.metric_drag_active = False
         self.metric_drag_pointer_id = None
         self.metric_drag_thumb_offset_y = 0
+        self.metric_pan_active = False
+        self.metric_pan_pointer_id = None
+        self.metric_pan_start_y = 0
+        self.metric_pan_start_scroll = 0
 
     def _load_cache_data(self):
         """Load cache data from cache_data.json"""
@@ -186,6 +190,8 @@ class MainScreen(BaseScreen):
         if event.type in (pygame.MOUSEBUTTONUP, pygame.FINGERUP):
             self.metric_drag_active = False
             self.metric_drag_pointer_id = None
+            self.metric_pan_active = False
+            self.metric_pan_pointer_id = None
 
         elif event.type in (pygame.MOUSEMOTION, pygame.FINGERMOTION) and self.metric_drag_active:
             if event.type == pygame.FINGERMOTION and self.metric_drag_pointer_id is not None:
@@ -195,16 +201,39 @@ class MainScreen(BaseScreen):
 
             if pos is not None:
                 self._set_metric_scroll_from_thumb_top(pos[1] - self.metric_drag_thumb_offset_y)
+            return
+
+        elif event.type in (pygame.MOUSEMOTION, pygame.FINGERMOTION) and self.metric_pan_active:
+            if event.type == pygame.FINGERMOTION and self.metric_pan_pointer_id is not None:
+                if event.finger_id != self.metric_pan_pointer_id:
+                    self.sidebar.handle_event(event)
+                    return
+
+            if pos is not None:
+                drag_delta = pos[1] - self.metric_pan_start_y
+                self.metric_scroll = self.metric_pan_start_scroll + drag_delta
+                self._clamp_metric_scroll()
+            return
 
         elif event.type in (pygame.FINGERDOWN, pygame.MOUSEBUTTONDOWN):
-            if self._try_start_metric_scroll_drag(event, pos):
-                return
-
-            # Handle popups
+            # Popups should always consume press events before any scrolling gesture.
             if self.popup:
                 self.popup.handle_event(event)
                 if not self.popup.open:
                     self.popup = None
+                return
+
+            if (
+                self.selected_device
+                and pos is not None
+                and self.metric_viewport_rect
+                and pos[0] > self.sidebar.current_width
+                and self.metric_viewport_rect.collidepoint(pos)
+            ):
+                self.metric_pan_active = True
+                self.metric_pan_start_y = pos[1]
+                self.metric_pan_start_scroll = self.metric_scroll
+                self.metric_pan_pointer_id = getattr(event, "finger_id", None)
                 return
 
             # Power Button clicked
@@ -263,7 +292,7 @@ class MainScreen(BaseScreen):
             mouse_pos = pygame.mouse.get_pos()
             if mouse_pos[0] <= self.sidebar.current_width:
                 self.scroll_devices(event.y)
-            elif self.selected_device and self.metric_viewport_rect and self.metric_viewport_rect.collidepoint(mouse_pos):
+            elif self.selected_device:
                 self.scroll_metrics(event.y)
             else:
                 self.scroll_devices(event.y)
@@ -276,20 +305,6 @@ class MainScreen(BaseScreen):
         if hasattr(event, "pos"):
             return event.pos
         return None
-
-    def _try_start_metric_scroll_drag(self, event, pos):
-        if not self.selected_device or pos is None:
-            return False
-        if not self.metric_scrollbar_thumb_rect:
-            return False
-
-        if self.metric_scrollbar_thumb_rect.collidepoint(pos):
-            self.metric_drag_active = True
-            self.metric_drag_thumb_offset_y = pos[1] - self.metric_scrollbar_thumb_rect.y
-            self.metric_drag_pointer_id = getattr(event, "finger_id", None)
-            return True
-
-        return False
 
     def update(self):
         self.sidebar.update()
@@ -404,7 +419,6 @@ class MainScreen(BaseScreen):
                 self._draw_metric_card(surface, rect, friendly_name, value_text, severity)
 
             surface.set_clip(old_clip)
-            self._draw_metric_scrollbar(surface)
         else:
             placeholder_font = pygame.font.SysFont("Arial", 30)
             placeholder = placeholder_font.render("Select a device to view stats", True, theme.LIGHT_GRAY)
@@ -488,6 +502,7 @@ class MainScreen(BaseScreen):
         self.metric_scroll += direction * scroll_amount
         self._clamp_metric_scroll()
 
+    # Compatibility helper for tests and any callers that still expect scrollbar geometry.
     def _draw_metric_scrollbar(self, surface):
         if not self.metric_viewport_rect:
             self.metric_scrollbar_track_rect = None
@@ -543,6 +558,20 @@ class MainScreen(BaseScreen):
         ratio = (clamped_thumb_y - min_thumb_y) / thumb_travel
         self.metric_scroll = -int(ratio * max_offset)
         self._clamp_metric_scroll()
+
+    def _try_start_metric_scroll_drag(self, event, pos):
+        if not self.selected_device or pos is None:
+            return False
+        if not self.metric_scrollbar_thumb_rect:
+            return False
+
+        if self.metric_scrollbar_thumb_rect.collidepoint(pos):
+            self.metric_drag_active = True
+            self.metric_drag_thumb_offset_y = pos[1] - self.metric_scrollbar_thumb_rect.y
+            self.metric_drag_pointer_id = getattr(event, "finger_id", None)
+            return True
+
+        return False
 
     def scroll_devices(self, direction):
         scroll_amount = 20

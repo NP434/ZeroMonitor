@@ -1,8 +1,8 @@
 import json
 from types import SimpleNamespace
 
-import driver as drv
-from driver import Driver, load_targets
+from src import driver as drv
+from src.driver import Driver, load_targets
 
 
 class DummyPollingAgent:

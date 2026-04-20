@@ -9,7 +9,7 @@ def perform_hard_reset():
     
     targets = [
         # Dev mode paths (Deleting the parent dev_vault takes out both ram and storage)
-        os.path.join(base_dir, "dev_vault"), 
+        os.path.join(base_dir, "../dev_vault"),
         
         # Standard Raspberry Pi paths
         "/home/zero_monitor_storage",

@@ -1,8 +1,7 @@
 # Control file for pairing module, handles add device events and communications
 # with the event bus
 
-import logging
-from event_bus import EventBus
+from src.event_bus import EventBus
 import subprocess
 import json
 from pathlib import Path

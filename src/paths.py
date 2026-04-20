@@ -10,8 +10,8 @@ class Config:
         
         if self.dev_mode:
             # dev_mode argparse repos
-            self.storage_dir = os.path.join(self.base_dir, "dev_vault", "storage")
-            self.ram_dir = os.path.join(self.base_dir, "dev_vault", "ram")
+            self.storage_dir = os.path.join(self.base_dir, "../dev_vault", "storage")
+            self.ram_dir = os.path.join(self.base_dir, "../dev_vault", "ram")
         else:
             # Standard Raspberry Pi paths
             self.storage_dir = "/home/zero_monitor_storage"
@@ -19,7 +19,7 @@ class Config:
 
         # Specific File Paths
         self.encrypted_list = os.path.join(self.storage_dir, "encrypted_device_list.enc")
-        self.decrypted_list = os.path.join(self.ram_dir, "device_list.json")
+        self.decrypted_list = os.path.join(self.ram_dir, "../data/device_list.json")
         self.ssh_key_enc = os.path.join(self.storage_dir, "id_ed25519.enc")
         self.ssh_key_ram = os.path.join(self.ram_dir, "decrypted_key")
         self.pass_file = os.path.join(self.ram_dir, "zero_pass.txt")

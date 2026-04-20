@@ -50,7 +50,7 @@ class DisplayUI:
     def __init__(self, config, bus=None, ui_control=None):
         # Initialize an EventBus
         if bus is None:
-            from event_bus import EventBus
+            from src.event_bus import EventBus
             bus = EventBus()
             bus.start()
         self.bus = bus

@@ -2,10 +2,10 @@ import json
 import os
 import subprocess
 
-import network_manager
-from network_manager import NetworkManager
-from paths import Config
-from security_manager import SecurityManager
+from src import network_manager
+from src.network_manager import NetworkManager
+from src.paths import Config
+from src.security_manager import SecurityManager
 
 
 def test_config_dev_mode_creates_dirs(tmp_path, monkeypatch):

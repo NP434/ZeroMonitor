@@ -1,6 +1,6 @@
 import time
 
-from event_bus import EventBus
+from src.event_bus import EventBus
 
 
 def test_event_bus_publish_subscribe_and_stop():

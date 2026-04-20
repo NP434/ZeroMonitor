@@ -1,3 +1,10 @@
+"""
+Polling Agent Module
+
+Handles remote system metrics collection via SSH connections.
+Implements OS-specific metrics providers for Linux and Windows systems.
+"""
+
 import threading
 import logging
 import time
@@ -9,9 +16,28 @@ from datetime import datetime
 from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 
-# This object is the direct result of metrics collection
+logger = logging.getLogger(__name__)
+
+
 @dataclass
 class SystemMetrics:
+    """
+    Raw system metrics collected from a remote system.
+
+    Attributes:
+        hostname: System hostname
+        timestamp: ISO format timestamp of collection
+        cpu_temp_c: CPU temperature in Celsius (optional)
+        cpu_load_1m: 1-minute load average (optional)
+        mem_total_mb: Total memory in MB
+        mem_used_mb: Used memory in MB
+        disk_used_percent: Disk usage percentage
+        core_voltage_v: Core voltage in volts (optional)
+        cpu_clock_mhz: CPU clock speed in MHz (optional)
+        uptime_seconds: System uptime in seconds (optional)
+        net_rx_kbps: Network RX bandwidth in kbps (optional)
+        net_tx_kbps: Network TX bandwidth in kbps (optional)
+    """
     hostname: str
     timestamp: str
     cpu_temp_c: Optional[float]
@@ -26,27 +52,51 @@ class SystemMetrics:
     net_tx_kbps: Optional[float]
 
 
-# This object is passed to the metrics queue and includes system metrics
 @dataclass
 class MetricEvent:
-    # Common name of node
+    """
+    Event containing metrics or error information passed through event queue.
+
+    Attributes:
+        node: Node identifier/hostname
+        success: Whether metrics collection succeeded
+        payload: Raw metrics dict or error information
+        timestamp: ISO format timestamp of event
+    """
     node: str
-    # Status of last polling attempt
     success: bool
-    # Metrics data
     payload: dict
-    # Timestamp
     timestamp: str
 
 
-# Abstract base class for all operating systems to be implmeneted
 class MetricsProvider(ABC):
+    """
+    Abstract base class for OS-specific metrics collection.
+
+    Subclasses implement the collect() method for their respective OS.
+    """
+
     def __init__(self, conn: Connection):
+        """
+        Initialize metrics provider.
+
+        Args:
+            conn: Fabric SSH connection to remote system
+        """
         self.conn = conn
 
     @abstractmethod
     def collect(self, node_name: str, stop_event=None) -> SystemMetrics:
-        """Abstract method to be implemented by subclasses"""
+        """
+        Collect system metrics from the remote system.
+
+        Args:
+            node_name: Name/identifier of the node
+            stop_event: Threading event to signal collection abort (optional)
+
+        Returns:
+            SystemMetrics object with collected data
+        """
         pass
 
 

@@ -1,10 +1,7 @@
 import pygame
-import sys
-import os
-import json
 
 # Standard Mock for the Event Bus and Control
-from event_bus import EventBus
+from src.event_bus import EventBus
 from ui.control_ui import ControlUI
 import ui.theme as theme
 

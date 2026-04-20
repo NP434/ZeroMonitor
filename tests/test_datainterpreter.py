@@ -1,8 +1,7 @@
 import json
-from types import SimpleNamespace
 
-import datainterpreter as di
-from datainterpreter import DataInterpreter
+from src import datainterpreter as di
+from src.datainterpreter import DataInterpreter
 
 
 class DummyMetricEvent:
@@ -177,10 +176,26 @@ def test_send_warning_email_ssl_and_starttls(fake_bus, temp_config, tmp_path, mo
     monkeypatch.setattr(di.smtplib, "SMTP_SSL", SMTPSSL)
     monkeypatch.setattr(di.smtplib, "SMTP", SMTP)
 
-    itp = _mk_interpreter(fake_bus, temp_config, tmp_path)
+    itp = _mk_interpreter(
+        fake_bus, temp_config, tmp_path,
+        smtp_server="smtp.example.com",
+        smtp_port=465,
+        smtp_user="user",
+        smtp_password="pass",
+        email_from="from@example.com",
+        email_to="to@example.com",
+    )
     itp._send_warning_email({"node": "n1"})
 
-    itp2 = _mk_interpreter(fake_bus, temp_config, tmp_path, smtp_port=587)
+    itp2 = _mk_interpreter(
+        fake_bus, temp_config, tmp_path,
+        smtp_server="smtp.example.com",
+        smtp_port=587,
+        smtp_user="user",
+        smtp_password="pass",
+        email_from="from@example.com",
+        email_to="to@example.com",
+    )
     itp2._send_warning_email({"node": "n2"})
 
     assert any(c[0] == "ssl" for c in calls)
@@ -212,7 +227,7 @@ def test_calculate_severity_and_threshold_clear(fake_bus, temp_config, tmp_path)
 def test_interpret_failure_logs_when_offline_write_fails(fake_bus, temp_config, tmp_path, monkeypatch):
     itp = _mk_interpreter(fake_bus, temp_config, tmp_path)
     logs = []
-    monkeypatch.setattr(di.logging, "error", lambda msg: logs.append(msg))
+    monkeypatch.setattr("src.datainterpreter.logger.error", lambda msg: logs.append(msg))
     monkeypatch.setattr(itp, "_write_to_json_file", lambda *_: (_ for _ in ()).throw(RuntimeError("bad write")))
 
     itp.interpret_data(DummyMetricEvent(success=False, payload={"error": "x"}))
@@ -221,8 +236,8 @@ def test_interpret_failure_logs_when_offline_write_fails(fake_bus, temp_config, 
 
 def test_interpret_success_prints_json_and_email_errors(fake_bus, temp_config, tmp_path, monkeypatch):
     itp = _mk_interpreter(fake_bus, temp_config, tmp_path)
-    printed = []
-    monkeypatch.setattr("builtins.print", lambda *args: printed.append(" ".join(str(a) for a in args)))
+    logged_errors = []
+    monkeypatch.setattr("src.datainterpreter.logger.error", lambda msg: logged_errors.append(msg))
     monkeypatch.setattr(itp, "_write_to_json_file", lambda *_: (_ for _ in ()).throw(RuntimeError("json boom")))
     monkeypatch.setattr(itp, "_send_warning_email", lambda *_: (_ for _ in ()).throw(RuntimeError("mail boom")))
 
@@ -233,8 +248,8 @@ def test_interpret_success_prints_json_and_email_errors(fake_bus, temp_config, t
         "mem_total_mb": 10,
         "disk_used_percent": 91,
     }))
-    assert any("JSON write error" in p for p in printed)
-    assert any("Email error" in p for p in printed)
+    assert any("JSON write error" in msg for msg in logged_errors)
+    assert any("Email error" in msg for msg in logged_errors)
 
 
 def test_threshold_cleared_event_is_published(fake_bus, temp_config, tmp_path):
@@ -289,8 +304,18 @@ def test_send_warning_email_logs_failure(fake_bus, temp_config, tmp_path, monkey
 
     logs = []
     monkeypatch.setattr(di.smtplib, "SMTP_SSL", BrokenSMTP)
-    monkeypatch.setattr(di.logging, "error", lambda msg: logs.append(msg))
+    monkeypatch.setattr("src.datainterpreter.logger.error", lambda msg: logs.append(msg))
 
-    itp = _mk_interpreter(fake_bus, temp_config, tmp_path)
+    itp = _mk_interpreter(
+        fake_bus,
+        temp_config,
+        tmp_path,
+        smtp_server="smtp.example.com",
+        smtp_port=465,
+        smtp_user="user",
+        smtp_password="pass",
+        email_from="from@example.com",
+        email_to="to@example.com",
+    )
     itp._send_warning_email({"node": "n"})
     assert any("Failed to send warning email" in msg for msg in logs)

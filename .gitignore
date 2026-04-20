@@ -62,3 +62,9 @@ logs/
 # Runtime-generated data files (never commit live cache)
 data/cache_data.json
 data/*.json
+
+# Environment configuration (contains sensitive credentials)
+.env
+.env.local
+.env.*.local
+

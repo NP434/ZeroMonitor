@@ -1,6 +1,9 @@
-# Fake Event Bus and Metric Event classes for testing purposes. In a real implementation,
-# these would be provided by the actual event system in use and would likely have more complex structures
-# and behaviors.
+"""
+Data Interpreter Module
+
+Processes raw system metrics from polling agents, computes severity levels,
+persists data to cache, and publishes alerts through the event bus.
+"""
 
 import json
 import os
@@ -9,51 +12,65 @@ import ssl
 import logging
 from email.message import EmailMessage
 from typing import Optional
-from event_bus import EventBus
+
+from .event_bus import EventBus
+from .constants import (
+    DEFAULT_THRESHOLDS,
+    HYSTERESIS,
+    SEVERITY_WARNING_THRESHOLD,
+    SEVERITY_CRITICAL_THRESHOLD,
+)
+
+logger = logging.getLogger(__name__)
 
 
-# Data Interpreter Module
 class DataInterpreter:
-    # Default Thresholds for metrics (can be overridden per device)
-    DEFAULT_THRESHOLDS = {
-        "cpu_load_1m": 0.80,
-        "mem_used_percent": 85.0,
-        "disk_used_percent": 90.0,
-        "cpu_temp_c": 80.0,
-        "core_voltage_v": 1.30,
-        "cpu_clock_mhz": 2200.0,
-        "uptime_seconds": 1209600.0,
-        "net_rx_kbps": 50000.0,
-        "net_tx_kbps": 50000.0,
-    }
+    """
+    Interprets and processes system metrics from polling agents.
 
-    # Optional hysteresis margins (how far below threshold to clear alert)
-    HYSTERESIS = {
-        "cpu_load_1m": 0.05,          # 5% drop required to clear
-        "mem_used_percent": 5.0,
-        "disk_used_percent": 5.0,
-        "cpu_temp_c": 5.0,
-        "core_voltage_v": 0.05,
-        "cpu_clock_mhz": 100.0,
-        "uptime_seconds": 3600.0,
-        "net_rx_kbps": 5000.0,
-        "net_tx_kbps": 5000.0,
-    }
+    Responsibilities:
+    - Evaluate metrics against configured thresholds
+    - Annotate metrics with severity levels
+    - Persist interpreted data to cache file
+    - Publish alerts through event bus
+    - Send email notifications for warnings/critical events
+    """
+
+    # Use imported constants from centralized configuration
+    DEFAULT_THRESHOLDS = DEFAULT_THRESHOLDS
+    HYSTERESIS = HYSTERESIS
 
     def __init__(
         self,
         event_bus: EventBus,
         config,
         json_filepath: str = "data/cache_data.json",
-        smtp_server: Optional[str] = "smtp.gmail.com",
-        smtp_port: Optional[int] = 465,
-        smtp_user: Optional[str] = "zeromonitoralerts@gmail.com",
-        smtp_password: Optional[str] = "xxdesmmolmmtdqdq",
-        email_from: Optional[str] = "zeromonitoralerts@gmail.com",
-        email_to: Optional[str] = "weeboo187@gmail.com",
+        smtp_server: Optional[str] = None,
+        smtp_port: Optional[int] = None,
+        smtp_user: Optional[str] = None,
+        smtp_password: Optional[str] = None,
+        email_from: Optional[str] = None,
+        email_to: Optional[str] = None,
     ):
+        """
+        Initialize DataInterpreter.
+
+        Args:
+            event_bus: EventBus instance for publishing events
+            config: Configuration object with file paths
+            json_filepath: Path to cache data JSON file
+            smtp_server: SMTP server address (from env: SMTP_SERVER)
+            smtp_port: SMTP port number (from env: SMTP_PORT)
+            smtp_user: SMTP login username (from env: SMTP_USER)
+            smtp_password: SMTP login password (from env: SMTP_PASSWORD)
+            email_from: Sender email address (from env: EMAIL_FROM)
+            email_to: Recipient email address (from env: EMAIL_TO)
+
+        Email configuration is loaded from environment variables if not provided.
+        Set SEND_ALERTS=false to disable all email notifications.
+        """
         self.event_bus = event_bus
-        self.config = config # For DEV MODE and Pathing
+        self.config = config
 
         self.thresholds = self.DEFAULT_THRESHOLDS.copy()
         self.device_thresholds = {}
@@ -61,14 +78,19 @@ class DataInterpreter:
         # Tracks current alert state: {(node, metric): bool}
         self.alert_state = {}
 
-        # Persistence and email config needs to be loaded from a config file.
+        # Persistence file path
         self.json_filepath = json_filepath
-        self.smtp_server = smtp_server
-        self.smtp_port = smtp_port
-        self.smtp_user = smtp_user
-        self.smtp_password = smtp_password
-        self.email_from = email_from
-        self.email_to = email_to
+
+        # Load email configuration from environment variables or use provided values
+        self.smtp_server = smtp_server or os.getenv("SMTP_SERVER")
+        self.smtp_port = smtp_port or int(os.getenv("SMTP_PORT", 0) or 0) or None
+        self.smtp_user = smtp_user or os.getenv("SMTP_USER")
+        self.smtp_password = smtp_password or os.getenv("SMTP_PASSWORD")
+        self.email_from = email_from or os.getenv("EMAIL_FROM")
+        self.email_to = email_to or os.getenv("EMAIL_TO")
+
+        # Check if alerts are enabled
+        self.send_alerts = os.getenv("SEND_ALERTS", "true").lower() == "true"
 
         self.event_bus.subscribe("METRIC_EVENT", self.interpret_data)
 
@@ -87,18 +109,29 @@ class DataInterpreter:
 
     # Main Entry Point
     def interpret_data(self, metric_event):
-        import logging
-        logging.info(f"[DataInterpreter] Received METRIC_EVENT for node: {metric_event.node}, success: {metric_event.success}")
+        """
+        Main entry point for processing metric events.
+
+        Args:
+            metric_event: MetricEvent object containing node metrics or error info
+        """
+        logger.info(
+            f"[DataInterpreter] Received METRIC_EVENT for node: {metric_event.node}, "
+            f"success: {metric_event.success}"
+        )
 
         if not metric_event.success:
-            logging.warning(f"[DataInterpreter] Handling failed metric event for {metric_event.node}: {metric_event.payload}")
+            logger.warning(
+                f"[DataInterpreter] Handling failed metric event for {metric_event.node}: "
+                f"{metric_event.payload}"
+            )
             try:
                 offline_payload = self._build_offline_payload(metric_event)
                 self._write_to_json_file(offline_payload)
                 self.event_bus.publish("device_offline", offline_payload)
                 self.event_bus.publish("data_interpreted", offline_payload)
             except Exception as e:
-                logging.error(f"[DataInterpreter] Failed to write offline event: {e}")
+                logger.error(f"[DataInterpreter] Failed to write offline event: {e}")
             return
 
         interpreted = self.process_data(metric_event)
@@ -112,17 +145,18 @@ class DataInterpreter:
         try:
             self._write_to_json_file(interpreted)
         except Exception as e:
-            # swallow persistence errors to not break pipeline
-            print("JSON write error: ", e)
+            logger.error(f"[DataInterpreter] JSON write error: {e}")
 
-        # If any severity is 'warning', attempt to send an email alert
+        # If any severity is 'warning' or higher, attempt to send an email alert
         try:
-            if any(s in ["warning", "critical", "severe"] for s in interpreted.get("severities", {}).values()
-                   if s is not None):
+            if self.send_alerts and any(
+                s in ["warning", "critical", "severe"]
+                for s in interpreted.get("severities", {}).values()
+                if s is not None
+            ):
                 self._send_warning_email(interpreted)
         except Exception as e:
-            # swallow email errors
-            print("Email error: ", e)
+            logger.error(f"[DataInterpreter] Email error: {e}")
 
         # Publish interpreted metrics (now always includes a 'severities' map)
         self.event_bus.publish("data_interpreted", interpreted)
@@ -241,6 +275,14 @@ class DataInterpreter:
 
     # Persistence: write/update JSON file with latest interpreted data per node
     def _write_to_json_file(self, interpreted):
+        """
+        Persist interpreted metrics to JSON cache file.
+
+        Updates or creates entry for the node with latest metrics and severity data.
+
+        Args:
+            interpreted: Interpreted metrics dictionary containing node, timestamp, metrics, severities
+        """
         data = self._load_cache_entries()
         self._ensure_cache_directory()
 
@@ -256,8 +298,10 @@ class DataInterpreter:
         data[node] = stored_entry
         self._write_cache_entries(data)
 
-        import logging
-        logging.info(f"[DataInterpreter] Updated cache_data.json for node '{node}' at {interpreted.get('timestamp')}")
+        logger.info(
+            f"[DataInterpreter] Updated cache_data.json for node '{node}' "
+            f"at {interpreted.get('timestamp')}"
+        )
 
     def _write_offline_event_to_json(self, metric_event):
         """Write offline status to cache when device fails SSH command"""
@@ -267,13 +311,24 @@ class DataInterpreter:
 
     # Email sending for warnings (no-op if SMTP not configured)
     def _send_warning_email(self, interpreted):
+        """
+        Send email notification for metrics warnings.
+
+        No-op if email is disabled or SMTP settings are not configured.
+
+        Args:
+            interpreted: Interpreted metrics dictionary
+        """
         if not (self.smtp_server and self.smtp_port and self.email_from and self.email_to):
             # SMTP not configured: skip sending
+            logger.debug("Email sending skipped - SMTP not configured")
             return
 
         try:
-            import logging
-            logging.info(f"[DataInterpreter] Attempting to send warning email for {interpreted.get('node')}")
+            logger.info(
+                f"[DataInterpreter] Attempting to send warning email for "
+                f"{interpreted.get('node')}"
+            )
             subject = f"Warning: metrics for {interpreted.get('node')}"
             body = json.dumps(interpreted, indent=2, sort_keys=True)
 
@@ -283,8 +338,7 @@ class DataInterpreter:
             msg["Subject"] = subject
             msg.set_content(body)
 
-            # Email sending with SSL/TLS if port is 465, otherwise starttls. Login if credentials provided.
-            # Choose connection method
+            # Email sending with SSL/TLS if port is 465, otherwise starttls
             context = ssl.create_default_context()
             if self.smtp_port == 465:
                 with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, context=context) as server:
@@ -298,11 +352,9 @@ class DataInterpreter:
                         server.login(self.smtp_user, self.smtp_password)
                     server.send_message(msg)
 
-            import logging
-            logging.info(f"[DataInterpreter] Warning email sent successfully")
+            logger.info("[DataInterpreter] Warning email sent successfully")
         except Exception as e:
-            import logging
-            logging.error(f"[DataInterpreter] Failed to send warning email: {e}")
+            logger.error(f"[DataInterpreter] Failed to send warning email: {e}")
 
     # Alert Evaluation
     def check_thresholds(self, interpreted):
@@ -351,15 +403,25 @@ class DataInterpreter:
         return triggered_alerts, cleared_alerts
 
     # Severity Calculation
-    def _calculate_severity(self, value, threshold):
+    def _calculate_severity(self, value: float, threshold: float) -> str:
+        """
+        Calculate severity level based on how much value exceeds threshold.
+
+        Args:
+            value: Current metric value
+            threshold: Threshold value
+
+        Returns:
+            Severity level: "warning", "critical", or "severe"
+        """
         if threshold == 0:
             return "warning"
 
         delta_ratio = (value - threshold) / threshold
 
-        if delta_ratio < 0.10:
+        if delta_ratio < SEVERITY_WARNING_THRESHOLD:
             return "warning"
-        elif delta_ratio < 0.25:
+        elif delta_ratio < SEVERITY_CRITICAL_THRESHOLD:
             return "critical"
         else:
             return "severe"

@@ -1,32 +1,47 @@
+"""
+Driver Module
+
+Manages the polling agent and routes control events from the UI.
+Coordinates metric collection and system lifecycle.
+"""
+
 import logging
-import uuid
 from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 from json import load
 
-from click import password_option
-
-from polling_agent import (
-    PollingAgent, 
-    Node, 
-    PersistentConnection, 
-    LinuxMetricsProvider, 
+from .polling_agent import (
+    PollingAgent,
+    Node,
+    PersistentConnection,
+    LinuxMetricsProvider,
     WindowsMetricsProvider
 )
-from event_bus import EventBus
+from .event_bus import EventBus
 
-# Set a standard logging format to be used by all modules
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)-7s | %(message)s",
-    datefmt="%H:%M:%S",
-)
+logger = logging.getLogger(__name__)
 
 # Control module linking application service
 class Driver:
-    """The driver owns the polling agent, and routes touchscreen control events to polling agent functions"""
+    """
+    Manages the polling agent and coordinates system lifecycle.
+
+    Responsibilities:
+    - Initialize and manage the polling agent
+    - Route UI control events to appropriate handlers
+    - Manage node addition/removal and polling configuration
+    - Dispatch collected metrics through the event bus
+    """
+
     def __init__(self, event_bus: EventBus, config):
-        self.config = config #FOR DEV MODE
+        """
+        Initialize Driver.
+
+        Args:
+            event_bus: EventBus instance for event distribution
+            config: Configuration object with file paths and settings
+        """
+        self.config = config
         self.polling_agent = None
         self.metrics_queue = None
         self.control_executor = None
@@ -34,41 +49,23 @@ class Driver:
         self.event_bus = event_bus
 
     def start(self):
-        """Function to start the monitoring system"""
-        logging.info("[Driver] Starting system...")
+        """Start the monitoring system and subscribe to control events."""
+        logger.info("[Driver] Starting system...")
 
         # Create polling queue
         self.metrics_queue = Queue()
 
-        # Create high level executor for background functions
+        # Create thread pool for background operations
         self.control_executor = ThreadPoolExecutor(max_workers=4)
 
         # Initialize polling agent
         self.polling_agent = PollingAgent(self.metrics_queue)
 
-        # Driver listens for UI control events
-        self.event_bus.subscribe(
-            # If event bus has event of this type
-            "UPDATE_POLLING_RATE",
-            # update_polling_rate requires a handler function because its payload has multiple components that must be parsed
-            self.update_polling_rate
-        )
-
-        self.event_bus.subscribe(
-            "REMOVE_NODE",
-            # remove_node needs a handler function as well because its payload must be parsed as well
-            self._handle_remove_node
-        )
-
-        self.event_bus.subscribe(
-            "STOP_SYSTEM",
-            self.stop_system
-        )
-
-        self.event_bus.subscribe(
-            "PAIRING_NODE_READY",
-            self.add_node
-        )
+        # Subscribe to control events from UI
+        self.event_bus.subscribe("UPDATE_POLLING_RATE", self.update_polling_rate)
+        self.event_bus.subscribe("REMOVE_NODE", self._handle_remove_node)
+        self.event_bus.subscribe("STOP_SYSTEM", self.stop_system)
+        self.event_bus.subscribe("PAIRING_NODE_READY", self.add_node)
 
         self.event_bus.subscribe(
             "PAUSE_POLLING",

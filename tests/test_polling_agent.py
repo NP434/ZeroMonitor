@@ -1,8 +1,7 @@
-from dataclasses import asdict
 from types import SimpleNamespace
 
-import polling_agent as pa
-from polling_agent import (
+from src import polling_agent as pa
+from src.polling_agent import (
     LinuxMetricsProvider,
     MetricEvent,
     Node,

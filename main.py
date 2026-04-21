@@ -12,13 +12,13 @@ import sys
 import logging
 
 # --- LOGGING SETUP (MUST BE FIRST) ---
-os.makedirs("../logs", exist_ok=True)
+os.makedirs("logs", exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | [%(name)s] %(message)s",
     handlers=[
-        logging.FileHandler("../logs/system.log"),
+        logging.FileHandler("logs/system.log"),
         logging.StreamHandler()  # Also print to terminal
     ]
 )
@@ -29,14 +29,14 @@ logger.info("ZeroMonitor System Starting")
 logger.info("=" * 60)
 
 # --- IMPORTS ---
-from .event_bus import EventBus
-from .driver import Driver
-from .datainterpreter import DataInterpreter
-from .network_manager import NetworkManager
+from src.event_bus import EventBus
+from src.driver import Driver
+from src.datainterpreter import DataInterpreter
+from src.network_manager import NetworkManager
 from ui.display_ui import DisplayUI
 from ui.control_ui import ControlUI
 from Pairing.pairing_control import ControlPairing
-from .paths import Config
+from src.paths import Config
 
 try:
     from security_manager import SecurityManager
@@ -102,3 +102,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

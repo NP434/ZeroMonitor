@@ -14,7 +14,7 @@ def create_startup_service():
 
     # Get absolute paths dynamically
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    main_script = os.path.join(base_dir, "main.py")
+    main_script = os.path.join(base_dir, "../main.py")
     
     # Check for venv 
     venv_options = ['venv', '.venv']

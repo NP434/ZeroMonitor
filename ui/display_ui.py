@@ -287,7 +287,7 @@ class DisplayUI:
 
         # If Wi-Fi is connected, go straight to Passcode creation
         print("[UI] Network connected. Routing to Update Screen")
-        return "updater"
+        #return "updater"
 
 
     def run(self):

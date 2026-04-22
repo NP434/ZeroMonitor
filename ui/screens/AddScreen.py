@@ -27,17 +27,12 @@ class AddScreen(BaseScreen):
             bg_color=theme.GREEN
         )
 
-        self.Endpoint_button = Button(
-            rect = (app.width / 2 - 100, 125, 100,60),
-            text="Endpoint",
-            bg_color=theme.BLUE
-        )
         self.Password_button = Button(
-            rect = ( app.width / 2, 125, 100,60),
+            rect = ( app.width / 2 - 50, 125, 100,60),
             text="Password",
             bg_color=theme.GRAY
         )
-        self.mode = "Endpoint"
+        self.mode = "Pass_auth"
 
         self.UserNameBox = Textbox(
             rect=(382, 225, 300, 50),
@@ -171,7 +166,7 @@ class AddScreen(BaseScreen):
                 "hostname": self.HostNameBox.txt,
                 "user": self.UserNameBox.txt,
                 "operating_system": "OS_Unknown",
-                "polling_frequency": 10,
+                "polling_frequency": 5,
                 "pairing_mode" : self.mode,
                 "Pword" : None
                 }
@@ -181,14 +176,9 @@ class AddScreen(BaseScreen):
                 if self.mode == "Pass_auth":
                     self.is_pairing = True
                     self.pending_device_name = node_config.get("name")
-            if self.Endpoint_button.is_clicked(pos):
-                self.mode = "Endpoint"
-                self.Password_button.bg_color = theme.GRAY
-                self.Endpoint_button.bg_color = theme.BLUE
             if self.Password_button.is_clicked(pos):
                 self.mode = "Pass_auth"
-                self.Password_button.bg_color = theme.BLUE
-                self.Endpoint_button.bg_color = theme.GRAY
+
                 
 
 
@@ -250,7 +240,6 @@ class AddScreen(BaseScreen):
         )
         self.back_button.draw(screen)
         self.done_button.draw(screen)
-        self.Endpoint_button.draw(screen)
         self.Password_button.draw(screen)
         
         mode = theme.DEFAULT_FONT.render("Pairing Mode", True, theme.WHITE)

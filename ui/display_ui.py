@@ -22,7 +22,7 @@ from ui.screens.UpdateScreen import UpdateScreen
 
 # initialize pygame
 pygame.init()
-
+pygame.mouse.set_visible(False)
 '''
 # Moved inside for pathing
 def load_devices():

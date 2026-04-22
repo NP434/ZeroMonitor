@@ -21,7 +21,7 @@ from ui.screens.EmailScreen import EmailScreen
 
 # initialize pygame
 pygame.init()
-
+pygame.mouse.set_visible(False)
 '''
 # Moved inside for pathing
 def load_devices():

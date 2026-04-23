@@ -78,6 +78,7 @@ class DisplayUI:
         self.height = 600
 
         self.screen = pygame.display.set_mode((self.width, self.height))
+        pygame.mouse.set_visible(False)
         pygame.display.set_caption("Zero Monitor LCD UI")
 
         # Load Devices safely using Dev Mode paths

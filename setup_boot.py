@@ -45,7 +45,7 @@ def create_startup_service():
 
         [Service]
         Type=simple
-        User={user}
+        User=root
         WorkingDirectory={base_dir}
         # Explicitly calling the venv python handles all dependencies like Fabric
         ExecStart={python_exec} {main_script}

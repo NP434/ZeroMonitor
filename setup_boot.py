@@ -52,6 +52,7 @@ def create_startup_service():
         Environment=DISPLAY=:0
         Environment=WAYLAND_DISPLAY=wayland-1
         Environment=XDG_RUNTIME_DIR=/run/user/1000
+        RuntimeDirectory=zero_monitor_decrypted
         Restart=always
         RestartSec=5
 

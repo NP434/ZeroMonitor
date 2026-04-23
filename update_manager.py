@@ -3,6 +3,8 @@ import sys
 import logging
 import time
 
+#PUT IN: sudo git config --global --add safe.directory /home/admin/ZeroMonitor
+
 class UpdateManager:
     def __init__(self, event_bus, config):
         self.bus = event_bus
@@ -25,6 +27,9 @@ class UpdateManager:
             return
 
         try:
+            # Assuming self.config.base_dir is the absolute path to your repo (e.g., /home/admin/ZeroMonitor)
+            repo_path = self.config.base_dir
+
             subprocess.run(["git", "fetch"], check=True, capture_output=True)
             local_hash = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
             remote_hash = subprocess.run(["git", "rev-parse", "@{u}"], capture_output=True, text=True).stdout.strip()

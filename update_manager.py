@@ -2,6 +2,8 @@ import subprocess
 import sys
 import logging
 import time
+import os
+import pygame
 
 #PUT IN: sudo git config --global --add safe.directory /home/admin/ZeroMonitor
 
@@ -55,9 +57,16 @@ class UpdateManager:
 
         self.logger.info("Pulling latest update from GitHub...")
         try:
-            subprocess.run(["git", "pull"], check=True, capture_output=True)
+            # Assuming you added cwd=self.config.base_dir based on the last step
+            subprocess.run(["git", "pull"], check=True, capture_output=True, cwd=self.config.base_dir)
             self.logger.info("Update successful! Rebooting application...")
-            sys.exit(0)
+            
+            # Release the KMS/DRM hardware display lock
+            pygame.quit() 
+            
+            # Hard-kill the entire application, bypassing any event bus threads
+            os._exit(0) 
+
         except Exception as e:
             self.logger.error(f"Failed to pull update: {e}")
             self.bus.publish("UPDATE_STATUS", {"status": "update_failed"})

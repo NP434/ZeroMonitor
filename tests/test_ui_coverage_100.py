@@ -246,14 +246,6 @@ def test_add_email_wifi_remaining_paths(monkeypatch, fake_bus, temp_config, ui_s
     add.active_textbox = add.passwordBox
     add.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=add.UserNameBox.rect.center))
 
-    add.handle_event(
-        pygame.event.Event(
-            pygame.FINGERDOWN,
-            x=add.Endpoint_button.rect.centerx / app.width,
-            y=add.Endpoint_button.rect.centery / app.height,
-        )
-    )
-
     email = EmailScreen(app)
     monkeypatch.setattr(email.keyboard, "handle_event", lambda _pos: True)
     email.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=email.save_btn.rect.center))

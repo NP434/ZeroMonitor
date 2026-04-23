@@ -40,7 +40,7 @@ def create_startup_service():
     service_content = textwrap.dedent(f"""\
         [Unit]
         Description=Zero Monitor Appliance
-        After=graphical.target network-online.target
+        After=multi-user.target network-online.target
         Wants=network-online.target
         StartLimitIntervalSec=0
 
@@ -48,18 +48,21 @@ def create_startup_service():
         Type=simple
         User=root
         WorkingDirectory={base_dir}
-        ExecStartPre=/bin/sleep 15
-        # Explicitly calling the venv python handles all dependencies like Fabric
+        
+        # Shortened sleep since we don't need to wait for a desktop
+        ExecStartPre=/bin/sleep 5
+        
         ExecStart={python_exec} {main_script}
-        Environment=DISPLAY=:0
-        Environment=WAYLAND_DISPLAY=wayland-1
-        Environment=XDG_RUNTIME_DIR=/run/user/1000
+        
+        # Tell Pygame/SDL2 to draw directly to the screen hardware
+        Environment=SDL_VIDEODRIVER=kmsdrm
+        
         RuntimeDirectory=zero_monitor_decrypted
         Restart=always
         RestartSec=5
 
         [Install]
-        WantedBy=graphical.target
+        WantedBy=multi-user.target
     """)
 
     service_path = "/etc/systemd/system/zero_monitor.service"

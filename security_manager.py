@@ -62,7 +62,7 @@ class SecurityManager:
         raw_key = argon2.low_level.hash_secret_raw(
             secret=passcode_bytes,
             salt=salt,
-            time_cost=20,          # CPU Iterations
+            time_cost=8,          # CPU Iterations
             memory_cost=65536,    # 64 MB of RAM
             parallelism=4,        # Use all 4 Cortex-A53 cores
             hash_len=32,          # Fernet requires exactly 32 bytes

@@ -42,11 +42,13 @@ def create_startup_service():
         Description=Zero Monitor Appliance
         After=graphical.target network-online.target
         Wants=network-online.target
+        StartLimitIntervalSec=0
 
         [Service]
         Type=simple
         User=root
         WorkingDirectory={base_dir}
+        ExecStartPre=/bin/sleep 15
         # Explicitly calling the venv python handles all dependencies like Fabric
         ExecStart={python_exec} {main_script}
         Environment=DISPLAY=:0

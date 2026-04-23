@@ -256,7 +256,6 @@ def test_add_wifi_email_extended_branches(monkeypatch, rich_ui_app, ui_surface):
     add.draw(ui_surface)
     assert isinstance(add.popup, DisplayPopup)
 
-    add.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=add.Endpoint_button.rect.center))
     add.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=add.Password_button.rect.center))
     add.DeviceNameBox.txt = "new-pass-node"
     add.HostNameBox.txt = "10.0.0.2"

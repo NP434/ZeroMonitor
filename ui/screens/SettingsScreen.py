@@ -458,7 +458,7 @@ class SettingsScreen(BaseScreen):
         self.pending_name_change = None
 
         self.app.ui_control.change_device_name(old_name, new_name)
-        self.app.bus.publish("SYNC_VAULT", {})
+        #self.app.bus.publish("SYNC_VAULT", {})
 
     def _revert_name_change(self):
         if not self.pending_name_change:

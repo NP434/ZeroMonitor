@@ -393,7 +393,7 @@ class SettingsScreen(BaseScreen):
                 if int(numeric) != int(self._original_polling_frequency):
                     self.app.ui_control.change_polling_rate(backend_name, int(numeric))
                     device["polling_frequency"] = int(numeric)
-                    #self.app.bus.publish("SYNC_VAULT", {})
+                    self.app.bus.publish("SYNC_VAULT", {})
                     self._pending_polling_rate_ack = True
                 else:
                     self._pending_polling_rate_ack = False

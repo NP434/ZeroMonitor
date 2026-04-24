@@ -168,29 +168,22 @@ class DisplayUI:
         host = payload["host"]
         rate = payload["poll_rate"]
 
-        # No pending name change — safe to update and rebuild now
         for d in self.devices:
             if d["name"] == host:
                 d["polling_frequency"] = rate
 
         if isinstance(self.current_screen, SettingsScreen):
             screen = self.current_screen
+
             if hasattr(screen, "on_polling_ack"):
                 screen.on_polling_ack(host, "rate")
-            elif getattr(screen, "pending_name_change", None):
+                return
+
+            if getattr(screen, "pending_name_change", None):
                 old_name, new_name = screen.pending_name_change
                 screen.pending_polling_change = False
                 screen._commit_name_change(old_name, new_name)
                 screen.unsaved_changes = False
-            screen._build_device_list()
-            screen._build_settings_widgets()
-
-        if isinstance(self.current_screen, MainScreen):
-            self.current_screen._build_device_buttons()
-
-        main_screen = self.screens.get("main")
-        if main_screen and not isinstance(self.current_screen, MainScreen):
-            main_screen._build_device_buttons()
 
     def _handle_ack_update_name(self, payload):
         old_name = payload["old_name"]

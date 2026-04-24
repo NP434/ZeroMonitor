@@ -32,7 +32,7 @@ class UpdateManager:
             # Assuming self.config.base_dir is the absolute path to your repo (e.g., /home/admin/ZeroMonitor)
             repo_path = self.config.base_dir
 
-            subprocess.run(["git", "fetch"], check=True, capture_output=True)
+            subprocess.run(["git", "fetch"], check=True, capture_output=True, cwd=repo_path)
             local_hash = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
             remote_hash = subprocess.run(["git", "rev-parse", "@{u}"], capture_output=True, text=True).stdout.strip()
 

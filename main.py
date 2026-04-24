@@ -6,7 +6,7 @@ import logging
 
 # --- LOGGING SET UP (MUST BE FIRST) ---
 # Create the hidden logs folder if it doesn't exist
-# Updoot Test
+# Updoot Test #2
 os.makedirs("logs", exist_ok=True)
 
 # Configure the global logging rules

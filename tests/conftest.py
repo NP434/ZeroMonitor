@@ -50,6 +50,7 @@ def temp_config(tmp_path):
         dev_mode=True,
         storage_dir=str(storage),
         ram_dir=str(ram),
+        base_dir=os.getcwd(),
         encrypted_list=str(storage / "encrypted_device_list.enc"),
         decrypted_list=str(ram / "device_list.json"),
         ssh_key_enc=str(storage / "id_ed25519.enc"),
@@ -61,6 +62,7 @@ def temp_config(tmp_path):
         server_cert=str(storage / "server.crt"),
         server_key=str(storage / "server.key"),
         email_settings=str(storage / "email_settings.json"),
+        ui_settings=str(storage / "ui_settings.json"),
     )
 
     with open(cfg.decrypted_list, "w", encoding="utf-8") as f:

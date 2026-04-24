@@ -426,6 +426,30 @@ def test_persistent_connection_open_password_branch(monkeypatch):
     assert conn.conn is not None
     assert created["host"] == "host"
     assert created["user"] == "user"
+    assert created["connect_kwargs"]["allow_agent"] is False
+    assert created["connect_kwargs"]["password"] == "secret"
+
+
+def test_persistent_connection_open_key_path_branch(monkeypatch):
+    created = {}
+
+    class FakeFabric:
+        def __init__(self, **kwargs):
+            created.update(kwargs)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(pa, "Connection", lambda **kwargs: FakeFabric(**kwargs))
+
+    conn = PersistentConnection("host", "user", "key.pem")
+    conn.open()
+
+    assert conn.conn is not None
+    assert created["host"] == "host"
+    assert created["user"] == "user"
+    assert created["connect_kwargs"]["key_filename"] == "key.pem"
+    assert created["connect_kwargs"]["allow_agent"] is False
 
 
 def test_persistent_connection_aborts_when_paused(monkeypatch):
@@ -481,5 +505,4 @@ def test_persistent_connection_aborts_before_attempt_when_already_paused(monkeyp
         assert "pause" in str(e).lower()
 
     assert called["n"] == 0
-
 

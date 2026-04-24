@@ -114,3 +114,72 @@ def test_security_manager_sync_failure_logs(fake_bus, temp_config, monkeypatch):
     sm._handle_sync_vault()
     assert any("Failed to sync vault" in msg for msg in logs)
 
+
+def test_update_manager_dev_mode(fake_bus, temp_config, monkeypatch):
+    from update_manager import UpdateManager
+    um = UpdateManager(fake_bus, temp_config)
+    assert "CHECK_FOR_UPDATE" in fake_bus.subscriptions
+    assert "APPLY_UPDATE" in fake_bus.subscriptions
+
+    # Dev mode check
+    um._handle_check()
+    published = [p for n, p in fake_bus.published if n == "UPDATE_STATUS"]
+    assert published[-1]["status"] == "up_to_date"
+
+    # Dev mode apply
+    um._handle_apply()
+    published = [p for n, p in fake_bus.published if n == "UPDATE_STATUS"]
+    assert published[-1]["status"] == "update_failed"
+
+
+def test_update_manager_prod_mode(fake_bus, temp_config, monkeypatch):
+    temp_config.dev_mode = False
+    from update_manager import UpdateManager
+    um = UpdateManager(fake_bus, temp_config)
+
+    # Mock subprocess for check
+    class MockRun:
+        def __init__(self, stdout=""):
+            self.stdout = stdout
+            self.returncode = 0
+
+    monkeypatch.setattr("update_manager.subprocess.run", lambda *a, **k: MockRun("abc123\n"))
+    um._handle_check()
+    published = [p for n, p in fake_bus.published if n == "UPDATE_STATUS"]
+    assert published[-1]["status"] == "up_to_date"
+
+    # Different hashes
+    calls = []
+    def mock_run(cmd, **k):
+        calls.append(cmd)
+        if cmd == ["git", "rev-parse", "HEAD"]:
+            return MockRun("local\n")
+        elif cmd == ["git", "rev-parse", "@{u}"]:
+            return MockRun("remote\n")
+        else:
+            return MockRun()
+    monkeypatch.setattr("update_manager.subprocess.run", mock_run)
+    um._handle_check()
+    published = [p for n, p in fake_bus.published if n == "UPDATE_STATUS"]
+    assert published[-1]["status"] == "available"
+
+    # Exception in check
+    monkeypatch.setattr("update_manager.subprocess.run", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("git fail")))
+    um._handle_check()
+    published = [p for n, p in fake_bus.published if n == "UPDATE_STATUS"]
+    assert published[-1]["status"] == "error"
+
+    # Apply success
+    temp_config.dev_mode = False
+    calls = []
+    monkeypatch.setattr("update_manager.subprocess.run", lambda cmd, **k: calls.append(cmd) or MockRun())
+    monkeypatch.setattr("update_manager.pygame.quit", lambda: None)
+    monkeypatch.setattr("update_manager.os._exit", lambda c: None)
+    um._handle_apply()
+    assert "git" in str(calls)
+
+    # Apply exception
+    monkeypatch.setattr("update_manager.subprocess.run", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("pull fail")))
+    um._handle_apply()
+    published = [p for n, p in fake_bus.published if n == "UPDATE_STATUS"]
+    assert published[-1]["status"] == "update_failed"

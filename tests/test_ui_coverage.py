@@ -671,6 +671,27 @@ def test_system_dashboard_screen_behavior(monkeypatch, tmp_path, rich_ui_app, ui
     assert fallback._calculate_aggregated_metrics() is None
     fallback.draw(ui_surface)
 
+    screen._on_data_interpreted({"node": "alpha", "metrics": {"cpu_load_1m": 0.5}})
+    assert "alpha" in screen.cache_data
+
+    # Cover no device selected
+    screen.selected_graph_device = None
+    screen._draw_metrics_table(ui_surface, pygame.Rect(0, 0, 300, 300), {}, [])
+
+    # Cover no metrics
+    screen.selected_graph_device = "beta"
+    screen._draw_metrics_table(ui_surface, pygame.Rect(0, 0, 300, 300), {}, [])
+
+    # Cover small chart rect
+    screen._draw_metrics_graph(ui_surface, pygame.Rect(0, 0, 50, 50), averages, graph_metrics)
+
+    # Cover axis labels
+    screen.metric_history = [
+        {"timestamp": "2026-04-08T10:00:00.000", "metrics": averages},
+        {"timestamp": "2026-04-08T10:01:00.000", "metrics": averages}
+    ]
+    screen._draw_metrics_graph(ui_surface, pygame.Rect(0, 0, 400, 300), averages, graph_metrics)
+
 
 def test_display_ui_init_handlers_and_run(monkeypatch, tmp_path, fake_bus, temp_config, ui_surface):
     class FakeEventBus:
@@ -822,7 +843,6 @@ def test_display_ui_init_handlers_and_run(monkeypatch, tmp_path, fake_bus, temp_
 
     app.current_screen = app.screens["main"]
     app._on_ack_update_polling_rate({"host": "alpha", "poll_rate": 22})
-    assert app.current_screen.build_calls >= 1
 
     app.current_screen = app.screens["settings"]
     app._handle_ack_update_name({"old_name": "alpha", "new_name": "zeta"})

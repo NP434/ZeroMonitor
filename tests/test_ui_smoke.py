@@ -223,6 +223,8 @@ def test_display_ui_boot_router_and_dummy_screen(monkeypatch, ui_surface, temp_c
     key_path = os.path.join(temp_config.storage_dir, "id_ed25519.enc")
     open(key_path, "wb").close()
     temp_config.ssh_key_enc = key_path
+    temp_config.dev_mode = False
+    monkeypatch.setattr(display_ui.subprocess, "run", lambda *a, **k: SimpleNamespace(stdout="100 (connected)"))
     assert ui._boot_router() == "updater"
 
     # first boot, prod mode, connected network -> updater

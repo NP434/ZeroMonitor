@@ -141,6 +141,9 @@ class SystemDashboardScreen(BaseScreen):
         )
         self._refresh_graph_device_selector()
 
+        # Subscribe to data updates for real-time refresh
+        self.app.bus.subscribe("data_interpreted", self._on_data_interpreted)
+
     def _load_cache_data(self):
         """Load cache data from cache_data.json"""
         cache_filepath = getattr(self.app.config, "cache_file", "data/cache_data.json")
@@ -641,8 +644,8 @@ class SystemDashboardScreen(BaseScreen):
         if sample_count >= 2:
             oldest_label = self._format_history_label(self.metric_history[0].get("timestamp"))
             newest_label = self._format_history_label(self.metric_history[-1].get("timestamp"))
-            old_text = theme.FONT_SMALL.render(oldest_label, True, theme.LIGHTER_GRAY)
-            new_text = theme.FONT_SMALL.render(newest_label, True, theme.LIGHTER_GRAY)
+            old_text = theme.FONT_SMALL.render(oldest_label, True, theme.LIGHT_GRAY)
+            new_text = theme.FONT_SMALL.render(newest_label, True, theme.LIGHT_GRAY)
             surface.blit(old_text, (chart_rect.x, chart_rect.bottom + 8))
             new_rect = new_text.get_rect(topright=(chart_rect.right, chart_rect.bottom + 8))
             surface.blit(new_text, new_rect)
@@ -754,5 +757,8 @@ class SystemDashboardScreen(BaseScreen):
         text = theme.FONT_SMALL.render(label, True, theme.LIGHTER_GRAY)
         surface.blit(text, (summary_rect.x, summary_rect.y))
 
-
-
+    def _on_data_interpreted(self, payload):
+        """Handle real-time data updates from the bus."""
+        if isinstance(payload, dict) and "node" in payload:
+            self.cache_data[payload["node"]] = payload
+            self._refresh_graph_device_selector()

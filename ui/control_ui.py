@@ -84,7 +84,10 @@ class ControlUI:
                 with open(path, "r") as f:
                     return json.load(f)
             except:
-                return {}
+                default_settings = {"brightness": 30, "sleep_enabled": False, "sleep_time": 3600}
+                with open(path, "w") as f:
+                    json.dump(default_settings, f, indent=2)
+                return default_settings
         return {}
 
     def _save_ui_settings(self, settings):

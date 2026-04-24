@@ -29,6 +29,7 @@ class Config:
         self.cache_file = os.path.join(self.storage_dir, "cache_data.json")
         self.email_settings = os.path.join(self.storage_dir, "email_settings.json")
         self.ssh_pub_key = os.path.join(self.storage_dir, "id_ed25519.pub")
+        self.ui_settings = os.path.join(self.storage_dir, "ui_settings.json")
         
 
         # Ensure directories exist

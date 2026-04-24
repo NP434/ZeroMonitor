@@ -78,7 +78,7 @@ class ControlUI:
         })
 
     def _load_ui_settings(self):
-        path = "data/ui_settings.json"
+        path = self.config.ui_settings
         if os.path.exists(path):
             try:
                 with open(path, "r") as f:
@@ -88,7 +88,7 @@ class ControlUI:
         return {}
 
     def _save_ui_settings(self, settings):
-        path = "data/ui_settings.json"
+        path = self.config.ui_settings
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
             json.dump(settings, f, indent=2)

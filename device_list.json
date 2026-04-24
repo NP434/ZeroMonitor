@@ -1,9 +1,0 @@
-{
-    "target_one": {
-        "name": "ZeroMonitorDevice2",
-        "hostname": "192.168.0.251",
-        "user": "admin",
-        "operating_system": "linux",
-        "polling_frequency": 3
-    }
-}

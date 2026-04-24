@@ -147,6 +147,11 @@ class SecurityManager:
             self.logger.info("--- Secrets Decrypted Successfully ---")
             # Tell UI we succeeded 
             self.bus.publish("UNLOCK_RESULT", {"success": True})
+            # Load Devices safely using Dev Mode paths
+            if os.path.exists(self.config.decrypted_list):
+                with open(self.config.decrypted_list, "r", encoding='utf-8') as file:
+                    device_data = json.load(file)
+            self.bus.publish("DEVICE_LIST_UPDATED", device_data)
 
         except Exception as e:
             error_str = str(e)

@@ -78,7 +78,10 @@ class DisplayUI:
         self.height = 600
 
         self.screen = pygame.display.set_mode((self.width, self.height))
-        pygame.mouse.set_visible(False)
+
+        if not self.config.dev_mode:
+            pygame.mouse.set_visible(False)
+
         pygame.display.set_caption("Zero Monitor LCD UI")
 
         # Load Devices safely using Dev Mode paths
@@ -248,19 +251,9 @@ class DisplayUI:
 
     def _boot_router(self):
         """Evaluates the system state to determine the first screen to show"""
-        print("[UI] Evaluating boot state artifacts...")
-        
-        # Check if the device has an encrypted vault (SSH Key)
-        is_first_boot = not os.path.exists(self.config.ssh_key_enc)
-        
-        # STANDARD BOOT (Vault Exists)
-        if not is_first_boot:
-            # Standard Boot: Always authenticate first!
-            print("[UI] Vault found. Standard Boot. Routing to Update Screen")
-            return "updater"
 
         # FIRST BOOT (No Vault Exists)
-        print("[UI] First Boot detected. Checking network...")
+        print("[UI] Boot Router: Checking network...")
         
         # Check Wi-Fi
         if self.config.dev_mode:

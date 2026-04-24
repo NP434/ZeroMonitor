@@ -522,6 +522,16 @@ class SettingsScreen(BaseScreen):
         self.active_tab = tab
         self.tab_system_btn.bg_color = theme.BLUE if tab == TAB_SYSTEM else theme.DARK_GRAY
         self.tab_device_btn.bg_color = theme.BLUE if tab == TAB_DEVICE else theme.DARK_GRAY
+         # Dynamically rebuild the device list whenever the Device tab is opened
+        if tab == TAB_DEVICE:
+            self._build_device_list()
+            
+            # Safety check: if the previously selected device was deleted elsewhere, clear the right panel
+            if self.selected_device not in self.device_buttons:
+                self.selected_device = None
+                self.device_settings_widgets = []
+                self.show_custom_textbox = False
+                self.show_numpad = False
 
     # ══════════════════════════════════════════════════════════════════════
     # Navigation
